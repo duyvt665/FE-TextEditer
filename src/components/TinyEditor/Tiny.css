@@ -1,0 +1,23 @@
+div.mce-container {
+  height: 100%;
+  border: none; /* Remove border */
+  border-radius: 0; /* Remove border-radius */
+}
+
+div.tox.tox-tinymce {
+  height: 100%;
+  border: none; /* Remove border */
+  border-radius: 0; /* Remove border-radius */
+}
+  
+  .tox .tox-statusbar__branding svg{
+    display: none;
+  }
+
+  .tox .tox-statusbar__branding{
+    display: none;
+  }
+
+  .tox .tox-statusbar__path {
+    display: none;
+  }
