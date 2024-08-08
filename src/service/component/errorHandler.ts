@@ -26,6 +26,15 @@ const handleApiError = (error: any) => {
             case 'USERNAME_EXISTS':
                 message.error("Username already exists!");
                 break;
+            case 'INVALID_USERID':
+                message.error("User not found!");
+                break;
+            case 'TITLE_ALREADY_EXISTS':
+                message.error("Title already exists!");
+                break;
+            case 'DOCUMENT_NOT_FOUND':
+                message.error("Document not found!");
+                break;
             default:
                 message.error("Error. Please try again!");
                 break;
