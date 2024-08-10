@@ -11,7 +11,8 @@ import { Button } from "../ui/button";
 import useFetchData from "@/service/component/getData";
 import { MenuOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import MenuMobile from "@/pages/components/MenuMobile";
-
+import { useNavigate } from "react-router-dom";
+import io from "socket.io-client";
 
 const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const [editorContent, setEditorContent] = useState<string>("");
@@ -23,8 +24,45 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const { data: documentData } = useFetchData(
     documentId ? `/user/infor-document/${documentId}` : null
   );
-  const wsRef = useRef<WebSocket | null>(null);
+  const navigate = useNavigate();
+  const socketRef = useRef<any>(null);
+  const isExternalUpdate = useRef(false);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() => {
+    console.log("Initializing socket connection");
+    socketRef.current = io("ws://localhost:5555");
+
+    socketRef.current.on("connect", () => {
+      console.log("Connected to server with socket ID:", socketRef.current.id);
+    });
+
+    socketRef.current.on("connect_error", (error: any) => {
+      console.error("Connection error:", error);
+    });
+
+    // Xử lý sự kiện nhận cập nhật từ server
+    socketRef.current.on("document-update", (updatedContent: string) => {
+      const decodedContent = Base64.decode(updatedContent);
+      console.log("Received document update:", decodedContent);
+      if (decodedContent !== editorContentRef.current) { 
+        isExternalUpdate.current = true; 
+        setEditorContent(decodedContent); 
+      }
+    });
+    // Tham gia phòng tài liệu
+    if (documentId) {
+      socketRef.current.emit("join-document", documentId);
+      console.log(`Joined document: ${documentId}`);
+    }
+
+    return () => {
+      console.log("Disconnecting socket");
+      socketRef.current.disconnect();
+    };
+  }, [documentId]);
+
+  // USEEFFECT CHECK UPDATES
   useEffect(() => {
     if (documentData) {
       loadContent();
@@ -32,34 +70,34 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     }
   }, [documentData]);
 
-  useEffect(() => {
-    wsRef.current = new WebSocket("ws://localhost:5555");
-
-    wsRef.current.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === "UPDATE") {
-        setEditorContent(message.content);
-        editorContentRef.current = message.content;
-      }
-    };
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
-
+  // HANDLE SHOW MENU MOBILE
   const handleShowMenuMobile = () => {
     setIsOpenMenu(!isOpenMenu);
   };
 
+  // HANDLE EDITOR CHANGE
   const handleEditorChange = (content: string) => {
-    setEditorContent(content);
-    editorContentRef.current = content;
+    if (!isExternalUpdate.current) {
+      setEditorContent(content);
+      editorContentRef.current = content;
+  
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+  
+      debounceRef.current = setTimeout(() => {
+        const base64Content = Base64.encode(content);
+        socketRef.current.emit("document-update", {
+          documentId,
+          content: base64Content,
+        });
+      }, 1000);
+    } else {
+      isExternalUpdate.current = false;
+    }
   };
 
-
+  // LOAD CONTENT DOCUMENT
   const loadContent = () => {
     const base64Content = documentData?.document?.content;
     const htmlContent = Base64.decode(base64Content);
@@ -67,6 +105,17 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     setTitle(documentData?.document?.title);
   };
 
+  //HANDLE CREATE NEW DOCUMENT
+  const handleNewDocument = () => {
+    setTitle("");
+    setEditorContent("");
+    editorContentRef.current = "";
+    setCheckUpdate(false);
+    navigate("/home" , {replace: true});
+    socketRef.current.disconnect();
+  };
+
+  //HANDLE SAVE DOCUMENT
   const handleSave = async () => {
     setDisabled(true);
     if (title === "") {
@@ -88,8 +137,19 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     }
   };
 
+  //HANDLE UPDATE DOCUMENT
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (checkUpdate && editorContentRef.current !== "") {
+        handleUpdate();
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [editorContent]);
+
   const handleUpdate = async () => {
-    setDisabled(true);
+    setDisabled(false);
     if (title === "") {
       message.error("Please input document title!");
       setTimeout(() => setDisabled(false), 2000);
@@ -103,21 +163,12 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
         newTitle: title,
         newContent: base64Content,
       });
-      if (wsRef.current) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: "UPDATE",
-            content: currentContent,
-          })
-        );
-      }
-      message.success("Document update successfully!");
       setTimeout(() => setDisabled(false), 2000);
     } catch (error) {
       setTimeout(() => setDisabled(false), 2000);
     }
   };
-
+  //END HANDLE UPDATE DOCUMENT
 
   return (
     <>
@@ -139,8 +190,11 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
             >
               Save
             </Button>
-            <Button className="bg-blue-500 hover:bg-blue-600 rounded-xl">
-              Share
+            <Button
+              className="bg-blue-500 hover:bg-blue-600 rounded-xl"
+              onClick={handleNewDocument}
+            >
+              New Document
             </Button>
             <Button
               className="bg-gray-200 hover:bg-gray-300 rounded-xl lg:hidden"
@@ -253,30 +307,9 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 });
               },
               automatic_uploads: true,
-              file_picker_types: 'image',
-              file_picker_callback: (cb, value, meta) => {
-                const input = document.createElement('input');
-                input.setAttribute('type', 'file');
-                input.setAttribute('accept', 'image/*');
-            
-                input.addEventListener('change', (e) => {
-                  const file = e.target.files[0];
-                  const reader = new FileReader();
-                  reader.addEventListener('load', () => {
-                    const id = 'blobid' + (new Date()).getTime();
-                    const blobCache =  tinymce.activeEditor.editorUpload.blobCache;
-                    const base64 = reader.result.split(',')[1];
-                    const blobInfo = blobCache.create(id, file, base64);
-                    blobCache.add(blobInfo);            
-                    cb(blobInfo.blobUri(), { title: file.name });
-                  });
-                  reader.readAsDataURL(file);
-                });
-            
-                input.click();
-              },
+              file_picker_types: "image",
               autosave_restore_when_empty: true,
-              autosave_ask_before_unload: false,
+              autosave_ask_before_unload: true,
               save_onsavecallback: () => {
                 message.success("Save Success!");
               },
@@ -286,7 +319,6 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
             }}
           />
         </div>
-        
       </div>
     </>
   );

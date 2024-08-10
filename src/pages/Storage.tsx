@@ -26,7 +26,6 @@ import apiService from "@/service/apiService";
 import SpinButton from "@/components/Loader/SpinButton";
 import Header from "./components/Header";
 import { saveAs } from "file-saver";
-import PizZip from "pizzip";
 import JSZip from "jszip";
 
 const Storage = () => {
@@ -45,6 +44,7 @@ const Storage = () => {
   const [form] = Form.useForm();
   const { RangePicker } = DatePicker;
   const { Search } = Input;
+  
   const { data: documentList, refetch } = useFetchData("/user/get-documents");
 
   //SET LOADING STATE
