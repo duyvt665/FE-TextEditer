@@ -12,6 +12,7 @@ import useFetchData from "@/service/component/getData";
 import { MenuOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import MenuMobile from "@/pages/components/MenuMobile";
 
+
 const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const [editorContent, setEditorContent] = useState<string>("");
   const [title, setTitle] = useState<string>("");
@@ -22,6 +23,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const { data: documentData } = useFetchData(
     documentId ? `/user/infor-document/${documentId}` : null
   );
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (documentData) {
@@ -29,6 +31,24 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
       setCheckUpdate(true);
     }
   }, [documentData]);
+
+  useEffect(() => {
+    wsRef.current = new WebSocket("ws://localhost:5555");
+
+    wsRef.current.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "UPDATE") {
+        setEditorContent(message.content);
+        editorContentRef.current = message.content;
+      }
+    };
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
 
   const handleShowMenuMobile = () => {
     setIsOpenMenu(!isOpenMenu);
@@ -38,6 +58,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     setEditorContent(content);
     editorContentRef.current = content;
   };
+
 
   const loadContent = () => {
     const base64Content = documentData?.document?.content;
@@ -82,12 +103,21 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
         newTitle: title,
         newContent: base64Content,
       });
+      if (wsRef.current) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "UPDATE",
+            content: currentContent,
+          })
+        );
+      }
       message.success("Document update successfully!");
       setTimeout(() => setDisabled(false), 2000);
     } catch (error) {
       setTimeout(() => setDisabled(false), 2000);
     }
   };
+
 
   return (
     <>
@@ -127,7 +157,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
             </Button>
             {isOpenMenu && (
               <div className="absolute top-[75px] right-[15px] z-20 md:top-[70px]">
-                <MenuMobile/>
+                <MenuMobile />
               </div>
             )}
           </div>
@@ -222,6 +252,29 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                     document.getElementById("file-input")?.click(),
                 });
               },
+              automatic_uploads: true,
+              file_picker_types: 'image',
+              file_picker_callback: (cb, value, meta) => {
+                const input = document.createElement('input');
+                input.setAttribute('type', 'file');
+                input.setAttribute('accept', 'image/*');
+            
+                input.addEventListener('change', (e) => {
+                  const file = e.target.files[0];
+                  const reader = new FileReader();
+                  reader.addEventListener('load', () => {
+                    const id = 'blobid' + (new Date()).getTime();
+                    const blobCache =  tinymce.activeEditor.editorUpload.blobCache;
+                    const base64 = reader.result.split(',')[1];
+                    const blobInfo = blobCache.create(id, file, base64);
+                    blobCache.add(blobInfo);            
+                    cb(blobInfo.blobUri(), { title: file.name });
+                  });
+                  reader.readAsDataURL(file);
+                });
+            
+                input.click();
+              },
               autosave_restore_when_empty: true,
               autosave_ask_before_unload: false,
               save_onsavecallback: () => {
@@ -233,6 +286,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
             }}
           />
         </div>
+        
       </div>
     </>
   );

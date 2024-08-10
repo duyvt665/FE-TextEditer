@@ -7,11 +7,15 @@ import StorageIcon from '@mui/icons-material/Storage';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import HelpIcon from '@mui/icons-material/Help';
+import useFetchData from "@/service/component/getData";
 
 const SideBar = () => {
   const navigation = useNavigate();
   const location = useLocation();
 
+  //API
+  const { data: userData, refetch: refetchUserData } = useFetchData("/user/get-info");
+    
   const getItemClass = (path: any) => {
     return location.pathname === path
       ? "bg-blue-500 text-white hover:bg-blue-500"
@@ -70,9 +74,9 @@ const SideBar = () => {
             <div className="w-[100%] flex flex-col justify-center items-center gap-2 xl:flex-row xl:justify-start xl:items-center xl:gap-2">
               <Avatar img="/avatar.JPG" alt="avatar of Jese" rounded size="md"/>
               <div className="flex flex-col items-center xl:items-start">
-                <span>duy950630@gmail.com</span>
+                <span>{userData?.userInfo?.email}</span>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  duyvt665
+                {userData?.userInfo?.username}
                 </span>
               </div>
             </div>

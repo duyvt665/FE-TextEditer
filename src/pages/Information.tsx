@@ -1,75 +1,31 @@
 import { useEffect, useState } from "react";
 import SideBar from "./components/SideBar";
 import SpinPage from "@/components/Loader/SpinPage";
-import { Input, Typography, Form } from "antd";
-import { LoadingOutlined, PlusOutlined } from "@ant-design/icons";
-import { message, Upload } from "antd";
-import type {
-  RcFile,
-  UploadChangeParam,
-  UploadFile,
-  UploadProps,
-} from "antd/es/upload/interface";
+import { Input, message } from "antd";
 import useFetchData from "@/service/component/getData";
+import Header from "./components/Header";
 import apiService from "@/service/apiService";
-
-type FileType = RcFile;
-const { Title } = Typography;
+import SpinButton from "@/components/Loader/SpinButton";
 
 const Information = () => {
   const [loadingPage, setLoadingPage] = useState(true);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [imageUrl, setImageUrl] = useState<string | undefined>();
-  const { data: userData, isLoading: userDataLoading } =
+  const [email, setEmail] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [initialUsername, setInitialUsername] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isPasswordInputsEmpty, setIsPasswordInputsEmpty] = useState(true);
+  const [isDisabledButtonInfor, setIsDisabledButtonInfor] = useState(false);
+  const [isDisabledButtonPassword, setIsDisabledButtonPassword] =
+    useState(false);
+
+  //API
+  const { data: userData, refetch: refetchUserData } =
     useFetchData("/user/get-info");
 
-  console.log(userData?.userInfo);
-
-  const getBase64 = (img: FileType, callback: (url: string) => void) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => callback(reader.result as string));
-    reader.readAsDataURL(img);
-  };
-
-  const beforeUpload = (file: FileType) => {
-    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
-
-    if (!isJpgOrPng) {
-      message.error("You can only upload JPG/PNG file!");
-    }
-    const isLt2M = file.size / 1024 / 1024 < 2;
-    if (!isLt2M) {
-      message.error("Image must smaller than 2MB!");
-    }
-    return isJpgOrPng && isLt2M;
-  };
-
-  const handleChange: UploadProps["onChange"] = (
-    info: UploadChangeParam<UploadFile<FileType>>
-  ) => {
-    if (info.file.status === "uploading") {
-      setLoading(true);
-      return;
-    }
-    if (info.file.status === "done") {
-      getBase64(info.file.originFileObj as FileType, (url) => {
-        setLoading(false);
-        setImageUrl(url);
-      });
-    }
-    if (info.file.status === "error") {
-      setLoading(false);
-      message.error("Upload failed.");
-    }
-  };
-
-  const uploadButton = (
-    <button style={{ border: 0, background: "none" }} type="button">
-      {loading ? <LoadingOutlined /> : <PlusOutlined />}
-      <div style={{ marginTop: 8 }}>Upload</div>
-    </button>
-  );
-
+  //SET LOADING STATE
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoadingPage(false);
@@ -77,6 +33,24 @@ const Information = () => {
 
     return () => clearTimeout(timer);
   }, []);
+
+  //SET VALUE INFORMATION
+  useEffect(() => {
+    setEmail(userData?.userInfo?.email);
+    setInitialEmail(userData?.userInfo?.email);
+    setUsername(userData?.userInfo?.username);
+    setInitialUsername(userData?.userInfo?.username);
+  }, [userData]);
+
+  //CHECK INFORMATION CHANGE
+  const isInforChanged = email !== initialEmail || username !== initialUsername;
+
+  //CHECK INPUTS PASSWORD EMPTY
+  useEffect(() => {
+    setIsPasswordInputsEmpty(
+      currentPassword === "" || newPassword === "" || confirmPassword === ""
+    );
+  }, [currentPassword, newPassword, confirmPassword]);
 
   //FORMAT DATE TIME
   const formatCreatedAt = (createdAt: any) => {
@@ -87,10 +61,58 @@ const Information = () => {
     return `${day}/${month}/${year}`;
   };
 
+  //HANDLE CHANGE INFORMATIONS
+  const handleChangeInformation = async () => {
+    setIsDisabledButtonInfor(true);
+    if (email === "" || username === "") {
+      message.error("Please input email or username!");
+      setTimeout(() => setIsDisabledButtonInfor(false), 2000);
+      return;
+    } 
+    try {
+      await apiService.put("/user/update-user", {
+        email: email,
+        username: username,
+      });
+      message.success("Information updated successfully!");
+      setTimeout(() => setIsDisabledButtonInfor(false), 2000);
+      refetchUserData();
+    } catch (e) {
+      setTimeout(() => setIsDisabledButtonInfor(false), 2000);
+    }
+  };
+
+  //HANDLE CHANGE PASSWORD
+  const handleChangePassword = async () => {
+    setIsDisabledButtonPassword(true);
+    if (newPassword !== confirmPassword) {
+      message.error("New password and confirm password do not match!");
+      setTimeout(() => setIsDisabledButtonPassword(false), 2000);
+      return;
+    } else if (newPassword.length < 8 || newPassword.length > 30 || currentPassword.length < 8 || currentPassword.length > 30) {
+      message.error("Password length must be between 8 and 30 characters!");
+      setTimeout(() => setIsDisabledButtonPassword(false), 2000);
+      return;
+    }
+    try {
+      await apiService.post("/user/change-password", {
+        password: currentPassword,
+        newPassword: newPassword,
+      });
+      message.success("Password changed successfully!");
+      setTimeout(() => setIsDisabledButtonPassword(false), 2000);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      setTimeout(() => setIsDisabledButtonPassword(false), 2000);
+    }
+  };
+
   return (
     <>
-      <div className="w-[100%] h-dvh flex justify-between">
-        <div className="w-[20%] h-[100%] hidden lg:block">
+      <div className="max-w-[100%] h-dvh flex justify-between overflow-hidden">
+        <div className="min-w-[20%] h-[100%] hidden lg:block">
           <SideBar />
         </div>
         {loadingPage ? (
@@ -98,57 +120,96 @@ const Information = () => {
             <SpinPage />
           </div>
         ) : (
-          <div className="w-[100%] h-[100%] flex justify-center items-center lg:w-[80%]">
-            <div className="w-[80%] h-[100%] flex flex-col justify-center items-center gap-4">
-              <div className="flex justify-between items-center w-full">
-                <div className="w-[15%]">
-                  
-                </div>
-                <div className="flex flex-col text-[14px] md:text-[20px] gap-3 w-[85%]">
-                  <span>{userData?.userInfo?.email}</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {userData?.userInfo?.username}
-                  </span>
-                </div>
+          <div className="w-[100%] h-[100%] flex justify-center items-center lg:w-[80%] overflow-auto">
+            <div className="w-[90%] h-[100%] flex flex-col gap-4">
+              <div className="w-full">
+                <Header title="Information" />
               </div>
-              <hr className="border-2 border-black w-full" />
-              <div className="w-full flex flex-col gap-4">
-                <Title level={4}>User Information</Title>
-                <Form layout="vertical" className="w-full">
-                  <Form.Item label="Email" name="email">
-                    <Input
-                      placeholder={userData?.userInfo?.email}
-                      className="rounded-[6px]"
-                      disabled
-                    />
-                  </Form.Item>
-                  <Form.Item label="Username" name="username">
-                    <Input
-                      placeholder={userData?.userInfo?.username}
-                      className="rounded-[6px]"
-                      disabled
-                    />
-                  </Form.Item>
-                  <Form.Item label="Password" name="password">
-                    <Input.Password
-                      placeholder="********"
-                      className="h-[41.6px]"
-                      disabled
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    label="Account Creation Date"
-                    name="creationDate"
+              <span className="text-[30px] font-bold">Profile</span>
+              <div className="w-full flex flex-col gap-4 items-start">
+                <span className="text-[24px] font-semibold">
+                  User Information
+                </span>
+                <div className="w-full flex flex-col gap-2">
+                  <span>Email</span>
+                  <Input
                     className="rounded-[6px]"
-                  >
-                    <Input
-                      placeholder={formatCreatedAt(
-                        userData?.userInfo?.createdAt
-                      )}
-                      disabled
-                    />
-                  </Form.Item>
-                </Form>
+                    type="email"
+                    onChange={(e) => setEmail(e.target.value)}
+                    value={email}
+                    required
+                  />
+                </div>
+                <div className="w-full flex flex-col gap-2">
+                  <span>Username</span>
+                  <Input
+                    className="rounded-[6px]"
+                    onChange={(e) => setUsername(e.target.value)}
+                    value={username}
+                  />
+                </div>
+                <div className="w-full flex flex-col gap-2">
+                  <span>Account Creation Date</span>
+                  <Input
+                    placeholder={formatCreatedAt(userData?.userInfo?.createdAt)}
+                    disabled
+                  />
+                </div>
+                <button
+                  className={`py-2 text-white rounded-sm w-[150px] ${
+                    !isInforChanged || isDisabledButtonInfor
+                      ? "bg-gray-300"
+                      : "bg-blue-500 hover:bg-blue-600"
+                  }`}
+                  disabled={!isInforChanged || isDisabledButtonInfor}
+                  onClick={handleChangeInformation}
+                >
+                  {isDisabledButtonInfor ? <SpinButton /> : "Update User"}
+                </button>
+              </div>
+
+              <div className="w-full flex flex-col gap-4 mt-5 items-start">
+                <span className="text-[24px] font-semibold">
+                  Authentication
+                </span>
+                <div className="w-full flex flex-col gap-2 ">
+                  <span>Current Password</span>
+                  <Input.Password
+                    className="rounded-[6px]"
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    value={currentPassword}
+                  />
+                </div>
+                <div className="w-full flex flex-col gap-2">
+                  <span>New Password</span>
+                  <Input.Password
+                    className="rounded-[6px]"
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    value={newPassword}
+                  />
+                </div>
+                <div className="w-full flex flex-col gap-2">
+                  <span>Confirm Password</span>
+                  <Input.Password
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    value={confirmPassword}
+                  />
+                </div>
+                <button
+                  className={`py-2 text-white rounded-sm w-[150px] mb-2 ${
+                    isPasswordInputsEmpty || isDisabledButtonPassword
+                      ? "bg-gray-300"
+                      : "bg-blue-500 hover:bg-blue-600"
+                  }`}
+                  disabled={isPasswordInputsEmpty || isDisabledButtonPassword}
+                  onClick={handleChangePassword}
+                >
+                  {isDisabledButtonPassword ? (
+                    <SpinButton />
+                  ) : (
+                    "Change Password"
+                  )}
+                </button>
               </div>
             </div>
           </div>

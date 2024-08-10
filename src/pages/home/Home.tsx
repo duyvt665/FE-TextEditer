@@ -28,7 +28,7 @@ const Home = () => {
   return (
     <>
       <div className="w-full h-dvh flex justify-between">
-        <div className="w-[20%] h-[100%] hidden lg:block">
+        <div className="min-w-[20%] h-[100%] hidden lg:block">
           <SideBar />
         </div>
         {loading ? (

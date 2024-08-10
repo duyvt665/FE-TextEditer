@@ -184,7 +184,7 @@ const Storage = () => {
         return;
       }
       const decodedContent = atob(content);
-      console.log(decodedContent)
+      console.log(decodedContent);
       const zip = new JSZip();
       zip.file("document.docx", decodedContent, { binary: true });
 
@@ -222,25 +222,27 @@ const Storage = () => {
         ) : (
           <div className="min-w-[100%] h-dvh  flex flex-col items-center gap-5 overflow-auto lg:min-w-[80%] ">
             {/* HEADER */}
-            <Header title="Storage" />
+            <div className="w-[90%]">
+              <Header title="Storage" />
+            </div>
 
             {/* FILTER */}
-            <div className="w-[90%] flex items-center gap-3">
+            <div className="w-[90%] flex flex-col items-start gap-3 mt-2 sm:flex-row sm:items-center">
               <Search
                 placeholder="Search Title"
                 allowClear
                 onChange={(e) => setSearchTitle(e.target.value)}
-                className="w-[20%]"
+                className="w-[50%] sm:w-[20%]"
               />
               <RangePicker
                 onChange={handleCreatedAtRange}
                 placeholder={["Start date", "End date"]}
-                className="w-[20%]"
+                className="w-[50%] sm:w-[20%]"
               />
               <Dropdown
                 overlay={sortMenu}
                 trigger={["click"]}
-                className="w-[10%]"
+                className="w-[30%] sm:w-[20%]"
               >
                 <Button>
                   Sort By <DownOutlined />
