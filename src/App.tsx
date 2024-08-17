@@ -2,21 +2,43 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "react-query";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
-
+import Home from "./pages/home/Home";
+import Information from "./pages/Information";
+import Storage from "./pages/Storage";
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import CheckOtp from "./pages/auth/CheckOtp";
 
 function App() {
   const queryClient = new QueryClient();
 
   return (
     <QueryClientProvider client={queryClient}>
-          <Router>
-            <div className="App">
-              <Routes>
-                <Route path="/" element={<Login />} />
-                <Route path="register" element={<Register />} />
-              </Routes>
-            </div>
-          </Router>
+      <AuthProvider>
+        <Router>
+          <div className="App">
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="register" element={<Register />} />
+              <Route
+                path="/home"
+                element={<ProtectedRoute element={<Home />} />}
+              />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-email" element={<CheckOtp />} />
+              <Route
+                path="/user/information"
+                element={<ProtectedRoute element={<Information />} />}
+              />
+              <Route
+                path="/user/storage"
+                element={<ProtectedRoute element={<Storage />} />}
+              />
+            </Routes>
+          </div>
+        </Router>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

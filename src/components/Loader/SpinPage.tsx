@@ -6,11 +6,11 @@ const SpinPage = () => {
       <ConfigProvider 
         theme={{
             token:{
-                colorPrimary: "#111111"
+                colorPrimary: "#3f83f8"
             }
         }}
       >
-        <Spin size="large" className="flex justify-center" />
+        <Spin size="large"/>
       </ConfigProvider>
     </>
   );
