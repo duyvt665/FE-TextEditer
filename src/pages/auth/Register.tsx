@@ -4,6 +4,7 @@ import apiService from "@/service/apiService";
 import { Form, Input, message } from "antd";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import loginBg from "../../assets/login2.jpg"
 
 const Register = () => {
   type FormData = {
@@ -43,7 +44,7 @@ const Register = () => {
         <div className="w-[100%] h-dvh flex">
           <div className="w-[50%] h-dvh bg-blue-300 hidden md:flex">
             <img
-              src="/login.jpg"
+              src={loginBg}
               alt="login"
               className="object-cover w-full h-full"
             />

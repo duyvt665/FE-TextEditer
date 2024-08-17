@@ -14,6 +14,12 @@ import MenuMobile from "@/pages/components/MenuMobile";
 import { useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 
+declare global {
+  interface Window {
+    tinymce: any; 
+  }
+}
+
 const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const [editorContent, setEditorContent] = useState<string>("");
   const [title, setTitle] = useState<string>("");
@@ -29,35 +35,23 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const isExternalUpdate = useRef(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  //SOCKET IO
   useEffect(() => {
-    console.log("Initializing socket connection");
     socketRef.current = io("ws://localhost:5555");
 
-    socketRef.current.on("connect", () => {
-      console.log("Connected to server with socket ID:", socketRef.current.id);
-    });
-
-    socketRef.current.on("connect_error", (error: any) => {
-      console.error("Connection error:", error);
-    });
-
-    // Xử lý sự kiện nhận cập nhật từ server
     socketRef.current.on("document-update", (updatedContent: string) => {
       const decodedContent = Base64.decode(updatedContent);
-      console.log("Received document update:", decodedContent);
-      if (decodedContent !== editorContentRef.current) { 
-        isExternalUpdate.current = true; 
-        setEditorContent(decodedContent); 
+      if (decodedContent !== editorContentRef.current) {
+        isExternalUpdate.current = true;
+        setEditorContent(decodedContent);
       }
     });
-    // Tham gia phòng tài liệu
+
     if (documentId) {
       socketRef.current.emit("join-document", documentId);
-      console.log(`Joined document: ${documentId}`);
     }
 
     return () => {
-      console.log("Disconnecting socket");
       socketRef.current.disconnect();
     };
   }, [documentId]);
@@ -80,11 +74,11 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     if (!isExternalUpdate.current) {
       setEditorContent(content);
       editorContentRef.current = content;
-  
+
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
-  
+
       debounceRef.current = setTimeout(() => {
         const base64Content = Base64.encode(content);
         socketRef.current.emit("document-update", {
@@ -111,7 +105,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     setEditorContent("");
     editorContentRef.current = "";
     setCheckUpdate(false);
-    navigate("/home" , {replace: true});
+    navigate("/home", { replace: true });
     socketRef.current.disconnect();
   };
 
@@ -174,12 +168,13 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     <>
       <div className="h-[100%] relative">
         <div className="w-[100%] h-[10%] flex justify-between items-center bg-[#F9FAFB] border-b">
-          <div className="flex w-[30%] justify-center items-center gap-2 ml-4">
+          <div className="flex w-[50%] justify-center items-center gap-2 ml-4 sm:w-[30%]">
             <Label className="text-[20px]">Title:</Label>
             <Input
               className="h-8"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              disabled={documentId}
             />
           </div>
           <div className="mr-4 flex gap-2">
@@ -244,7 +239,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 insert: {
                   title: "Insert",
                   items:
-                    "link media | template hr | pagebreak charmap emoticons | insertdatetime",
+                    "link media image | template hr | pagebreak charmap emoticons | insertdatetime",
                 },
                 format: {
                   title: "Format",
@@ -307,7 +302,6 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 });
               },
               automatic_uploads: true,
-              file_picker_types: "image",
               autosave_restore_when_empty: true,
               autosave_ask_before_unload: true,
               save_onsavecallback: () => {
@@ -316,6 +310,41 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
               content_style:
                 "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
               toolbar_mode: "sliding",
+              file_picker_types: "file image media",
+              file_picker_callback: (cb,meta: any) => {
+                const input = document.createElement("input");
+                input.setAttribute("type", "file");
+                if (meta.filetype === "image") {
+                  input.setAttribute("accept", "image/*");
+                } else if (meta.filetype === "media") {
+                  input.setAttribute("accept", "video/*, audio/*");
+                } else {
+                  input.setAttribute("accept", "*");
+                }
+      
+                input.onchange = function (e) {
+                  const target = e.target as HTMLInputElement;
+                  const file = target.files?.[0];
+      
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function () {
+                      const base64 = reader.result?.toString().split(",")[1];
+                      const id = "blobid" + new Date().getTime();
+                      const blobCache = window.tinymce?.activeEditor?.editorUpload.blobCache;
+                      const blobInfo = blobCache?.create(id, file, base64);
+      
+                      if (blobInfo) {
+                        blobCache.add(blobInfo);
+                        cb(blobInfo.blobUri(), { title: file.name });
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                };
+      
+                input.click();
+              },
             }}
           />
         </div>

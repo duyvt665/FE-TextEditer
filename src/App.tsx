@@ -7,6 +7,8 @@ import Information from "./pages/Information";
 import Storage from "./pages/Storage";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import CheckOtp from "./pages/auth/CheckOtp";
 
 function App() {
   const queryClient = new QueryClient();
@@ -23,6 +25,8 @@ function App() {
                 path="/home"
                 element={<ProtectedRoute element={<Home />} />}
               />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/verify-email" element={<CheckOtp />} />
               <Route
                 path="/user/information"
                 element={<ProtectedRoute element={<Information />} />}

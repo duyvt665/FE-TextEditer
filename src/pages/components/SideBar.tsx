@@ -85,7 +85,7 @@ const SideBar = () => {
               <Sidebar.Item icon={LogoutIcon} onClick={handleLogout}>
                 Log Out
               </Sidebar.Item>
-              <Sidebar.Item icon={HelpIcon}>Help</Sidebar.Item>
+              {/* <Sidebar.Item icon={HelpIcon}>Help</Sidebar.Item> */}
             </Sidebar.ItemGroup>
           </Sidebar.Items>
         </Sidebar>

@@ -5,6 +5,7 @@ import { useState } from "react";
 import Cookies from "js-cookie";
 import { useNavigate } from "react-router-dom";
 import SpinButton from "@/components/Loader/SpinButton";
+import loginBg from "../../assets/login2.jpg"
 
 const Login = () => {
 
@@ -19,6 +20,10 @@ const Login = () => {
   const handleRegister = () => {
     navigate("/register");
   };
+
+  const handleForgotPassword = () => {
+    navigate("/forgot-password");
+  }
 
   const onSubmit = async (values: FormData) => {
     setIsDisabled(true)
@@ -40,7 +45,7 @@ const Login = () => {
         <div className="w-[100%] h-dvh flex ">
           <div className=" hidden w-[50%] h-dvh bg-blue-300 md:flex">
             <img
-              src="/login.jpg"
+              src={loginBg}
               alt="login"
               className="object-cover w-full h-full"
             />
@@ -109,6 +114,7 @@ const Login = () => {
                     Register
                   </button>
                 </span>
+                <button className="text-[14px] text-gray-400 sm:text-[18px] hover:underline" onClick={handleForgotPassword}>Forgot Password?</button>
               </div>
             </div>
           </div>

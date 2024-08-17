@@ -18,6 +18,7 @@ import {
   Menu,
   message,
   Modal,
+  Pagination,
   Tooltip,
 } from "antd";
 import useFetchData from "@/service/component/getData";
@@ -25,8 +26,7 @@ import { useNavigate } from "react-router-dom";
 import apiService from "@/service/apiService";
 import SpinButton from "@/components/Loader/SpinButton";
 import Header from "./components/Header";
-import { saveAs } from "file-saver";
-import JSZip from "jszip";
+import React from "react";
 
 const Storage = () => {
   const [loading, setLoading] = useState(true);
@@ -44,9 +44,44 @@ const Storage = () => {
   const [form] = Form.useForm();
   const { RangePicker } = DatePicker;
   const { Search } = Input;
-  
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 4;
+
   const { data: documentList, refetch } = useFetchData("/user/get-documents");
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+  const paginatedDocuments = React.useMemo(() => {
+    if (!documentList) return [];
+
+    return Object.values(documentList)
+      .filter((doc: any) =>
+        doc._id &&
+        doc.title.toLowerCase().includes(searchTitle.toLowerCase()) &&
+        (!createdAtRange ||
+          ((!createdAtRange[0] ||
+            new Date(doc.createdAt).setHours(0, 0, 0, 0) >=
+              new Date(createdAtRange[0]).setHours(0, 0, 0, 0)) &&
+            (!createdAtRange[1] ||
+              new Date(doc.createdAt).setHours(0, 0, 0, 0) <=
+                new Date(createdAtRange[1]).setHours(23, 59, 59, 999))))
+      )
+      .sort((a: any, b: any) => {
+        if (sortOrder === "newest") {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        } else if (sortOrder === "oldest") {
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        }
+        return 0;
+      });
+  }, [documentList, searchTitle, createdAtRange, sortOrder]);
+
+  const currentDocuments = paginatedDocuments.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+  
   //SET LOADING STATE
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -176,25 +211,37 @@ const Storage = () => {
     }
   };
 
-  const handleDownloadDocument = async (doc: any) => {
-    try {
-      const content = doc?.content;
-      if (!content) {
-        message.error("No content available to download!");
-        return;
-      }
-      const decodedContent = atob(content);
-      console.log(decodedContent);
-      const zip = new JSZip();
-      zip.file("document.docx", decodedContent, { binary: true });
+  //HANDLE DOWNLOAD DOCUMENT
+  const handleDownloadDocument = async (content: any, filename: string) => {
+    let htmlContent = atob(content);
+    const preHtml =
+      "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc</title></head><body>";
 
-      const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, "document.docx");
-      message.success("Document downloaded successfully!");
-    } catch (err) {
-      console.log(err);
-      message.error("Failed to download document.");
+    const postHtml = "</body></html>";
+    const fullHtml = preHtml + htmlContent + postHtml;
+
+    const blob = new Blob(["\ufeff", fullHtml], {
+      type: "application/msword",
+    });
+
+    const url =
+      "data:application/vnd.ms-word;charset=utf-8," +
+      encodeURIComponent(fullHtml);
+
+    filename = filename.endsWith(".doc") ? filename : `${filename}.doc`;
+
+    const downloadLink = document.createElement("a");
+    document.body.appendChild(downloadLink);
+
+    if ((navigator as any).msSaveOrOpenBlob) {
+      (navigator as any).msSaveOrOpenBlob(blob, filename);
+    } else {
+      downloadLink.href = url;
+      downloadLink.download = filename;
+      downloadLink.click();
     }
+
+    document.body.removeChild(downloadLink);
   };
 
   const sortMenu = (
@@ -251,39 +298,7 @@ const Storage = () => {
             </div>
 
             {/*STORAGE DOCUMENT */}
-            {Object.values(documentList)
-              ?.filter(
-                (doc: any) =>
-                  doc._id &&
-                  doc.title.toLowerCase().includes(searchTitle.toLowerCase()) &&
-                  (!createdAtRange ||
-                    ((!createdAtRange[0] ||
-                      new Date(doc.createdAt).setHours(0, 0, 0, 0) >=
-                        new Date(createdAtRange[0]).setHours(0, 0, 0, 0)) &&
-                      (!createdAtRange[1] ||
-                        new Date(doc.createdAt).setHours(0, 0, 0, 0) <=
-                          new Date(createdAtRange[1]).setHours(
-                            23,
-                            59,
-                            59,
-                            999
-                          ))))
-              )
-              .sort((a: any, b: any) => {
-                if (sortOrder === "newest") {
-                  return (
-                    new Date(b.createdAt).getTime() -
-                    new Date(a.createdAt).getTime()
-                  );
-                } else if (sortOrder === "oldest") {
-                  return (
-                    new Date(a.createdAt).getTime() -
-                    new Date(b.createdAt).getTime()
-                  );
-                }
-                return 0;
-              })
-              .map((doc: any) => (
+            {currentDocuments.map((doc: any) => (
                 <div
                   key={doc?._id}
                   className="w-[90%] mt-2 border-b-2 border-t-2 flex justify-center items-center gap-2 md:h-[16%]"
@@ -311,8 +326,10 @@ const Storage = () => {
                         <Tooltip title="Download">
                           <Button
                             shape="circle"
-                            onClick={() => handleDownloadDocument(doc)}
                             icon={<VerticalAlignBottomOutlined />}
+                            onClick={() =>
+                              handleDownloadDocument(doc?.content, doc?.title)
+                            }
                             disabled={isDisabled}
                           />
                         </Tooltip>
@@ -350,6 +367,15 @@ const Storage = () => {
                   </div>
                 </div>
               ))}
+              <div className="w-[90%] flex fixed bottom-1 justify-center mt-4">
+                <Pagination
+                  current={currentPage}
+                  total={paginatedDocuments.length}
+                  pageSize={pageSize}
+                  onChange={handlePageChange}
+                  showSizeChanger={false}
+                />
+              </div> 
           </div>
         )}
 
