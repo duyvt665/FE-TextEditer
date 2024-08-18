@@ -2,13 +2,24 @@ import { useEffect, useState } from "react";
 import SideBar from "./components/SideBar";
 import SpinPage from "@/components/Loader/SpinPage";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AppstoreOutlined,
   BarsOutlined,
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
+  EllipsisOutlined,
   EyeOutlined,
+  FileTextOutlined,
   FileTextTwoTone,
+  FolderOpenTwoTone,
+  FolderOutlined,
+  PlusCircleOutlined,
   ShareAltOutlined,
   UserOutlined,
   VerticalAlignBottomOutlined,
@@ -57,20 +68,28 @@ const Storage = () => {
   const [permission, setPermission] = useState("view");
   const [permissionsUser, setPermissionsUser] = useState("view");
   const [emailUser, setEmailUser] = useState("");
-  const pageSize = 4;
+
   const [userOwners, setUserOwners] = useState<
     { email: string; permission: string }[]
   >([]);
+  const [viewMode, setViewMode] = useState("List");
+  const [viewType, setViewType] = useState("File");
+  const pageSize = viewMode === "List" ? 4 : 6;
 
   const { data: documentList, refetch } = useFetchData("/user/get-documents");
+  const { data: folderList, refetch: folderRefetch } =
+    useFetchData("/folder/get-all");
   const { data: userData } = useFetchData("/user/get-info");
+
+  const dataList = viewType === "File" ? documentList : folderList;
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
   const paginatedDocuments = React.useMemo(() => {
-    if (!documentList) return [];
+    if (!dataList) return [];
 
-    return Object.values(documentList)
+    return Object.values(dataList)
       .filter(
         (doc: any) =>
           doc._id &&
@@ -95,7 +114,7 @@ const Storage = () => {
         }
         return 0;
       });
-  }, [documentList, searchTitle, createdAtRange, sortOrder]);
+  }, [dataList, searchTitle, createdAtRange, sortOrder]);
 
   const currentDocuments = paginatedDocuments.slice(
     (currentPage - 1) * pageSize,
@@ -331,7 +350,7 @@ const Storage = () => {
             </div>
 
             {/* FILTER */}
-            <div className="w-[90%] flex items-start justify-between gap-3 mt-2 sm:flex-row sm:items-center">
+            <div className="w-[90%] flex flex-col items-start justify-between gap-3 mt-2 sm:flex-row sm:items-center">
               <div className="w-[100%] flex flex-col gap-3 sm:flex-row">
                 <Search
                   placeholder="Search Title"
@@ -354,7 +373,23 @@ const Storage = () => {
                   </Button>
                 </Dropdown>
               </div>
-              <div className="w-[]">
+              <div className="flex gap-2">
+                <Segmented
+                  options={[
+                    {
+                      label: "File",
+                      value: "File",
+                      icon: <FileTextOutlined />,
+                    },
+                    {
+                      label: "Folder",
+                      value: "Folder",
+                      icon: <FolderOutlined />,
+                    },
+                  ]}
+                  value={viewType}
+                  onChange={setViewType}
+                />
                 <Segmented
                   options={[
                     { label: "List", value: "List", icon: <BarsOutlined /> },
@@ -364,94 +399,316 @@ const Storage = () => {
                       icon: <AppstoreOutlined />,
                     },
                   ]}
+                  value={viewMode}
+                  onChange={setViewMode}
                 />
               </div>
             </div>
 
             {/*STORAGE DOCUMENT */}
-            {currentDocuments.map((doc: any) => {
-              const userPermissions =
-                doc.permissions?.[userData?.userInfo?._id];
-              const canEdit = userPermissions === "edit";
+            {viewMode === "List" && viewType === "File" ? (
+              currentDocuments.map((doc: any) => {
+                const userPermissions =
+                  doc.permissions?.[userData?.userInfo?._id];
+                const canEdit = userPermissions === "edit";
 
-              return (
-                <div
-                  key={doc?._id}
-                  className="w-[90%] mt-2 border-b-2 border-t-2 flex justify-center items-center gap-2 md:h-[16%]"
-                >
-                  <div className="w-[20%] flex justify-center border-r-2">
-                    <FileTextTwoTone className="text-[30px] sm:text-[60px]" />
-                  </div>
-                  <div className="w-[80%] flex flex-col p-2 gap-2">
-                    <div className="flex justify-between items-center font-semibold w-[100%]">
-                      <button
-                        className="max-w-[50%] text-[20px] hover:underline sm:text-[25px] truncate sm:max-w-[70%]"
-                        onClick={() => handleEditorChange(doc._id)}
-                      >
-                        {doc?.title}
-                      </button>
-                      <div className="max-w-[50%] flex gap-2 sm:max-w-[30%]">
-                        <Tooltip title="Edit">
-                          <Button
-                            shape="circle"
-                            icon={<EditOutlined />}
-                            disabled={
-                              isDisabled ||
-                              (!canEdit &&
-                                doc?.owner !== userData?.userInfo?.email)
-                            }
-                            onClick={() => handleShowModalChangeTitle(doc?._id)}
-                          />
-                        </Tooltip>
-                        <Tooltip title="Download">
-                          <Button
-                            shape="circle"
-                            icon={<VerticalAlignBottomOutlined />}
-                            onClick={() =>
-                              handleDownloadDocument(doc?.content, doc?.title)
-                            }
-                            disabled={isDisabled}
-                          />
-                        </Tooltip>
-                        <Tooltip title="Share">
-                          <Button
-                            shape="circle"
-                            icon={<ShareAltOutlined />}
-                            disabled={
-                              isDisabled ||
-                              (!canEdit &&
-                                doc?.owner !== userData?.userInfo?.email)
-                            }
-                            onClick={() =>
-                              handleShowModalShareDocument(doc?._id)
-                            }
-                          />
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <Button
-                            shape="circle"
-                            icon={<DeleteOutlined />}
-                            onClick={() => showModalDelete(doc?._id)}
-                            disabled={isDisabled}
-                          />
-                        </Tooltip>
+                return (
+                  <div
+                    key={doc?._id}
+                    className="w-[90%] mt-2 border-b-2 border-t-2 flex justify-center items-center gap-2 md:h-[16%]"
+                  >
+                    <div className="w-[20%] flex justify-center border-r-2">
+                      <FileTextTwoTone className="text-[30px] sm:text-[60px]" />
+                    </div>
+                    <div className="w-[80%] flex flex-col p-2 gap-2">
+                      <div className="flex justify-between items-center font-semibold w-[100%]">
+                        <button
+                          className="max-w-[50%] text-[20px] hover:underline sm:text-[25px] truncate sm:max-w-[70%]"
+                          onClick={() => handleEditorChange(doc._id)}
+                        >
+                          {doc?.title}
+                        </button>
+                        <div className="max-w-[50%] flex gap-2 sm:max-w-[30%]">
+                          <Tooltip title="Edit Title">
+                            <Button
+                              shape="circle"
+                              icon={<EditOutlined />}
+                              disabled={
+                                isDisabled ||
+                                (!canEdit &&
+                                  doc?.owner !== userData?.userInfo?.email)
+                              }
+                              onClick={() =>
+                                handleShowModalChangeTitle(doc?._id)
+                              }
+                            />
+                          </Tooltip>
+                          <Tooltip title="Download">
+                            <Button
+                              shape="circle"
+                              icon={<VerticalAlignBottomOutlined />}
+                              onClick={() =>
+                                handleDownloadDocument(doc?.content, doc?.title)
+                              }
+                              disabled={isDisabled}
+                            />
+                          </Tooltip>
+                          <Tooltip title="Share">
+                            <Button
+                              shape="circle"
+                              icon={<ShareAltOutlined />}
+                              disabled={
+                                isDisabled ||
+                                (!canEdit &&
+                                  doc?.owner !== userData?.userInfo?.email)
+                              }
+                              onClick={() =>
+                                handleShowModalShareDocument(doc?._id)
+                              }
+                            />
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <Button
+                              shape="circle"
+                              icon={<DeleteOutlined />}
+                              onClick={() => showModalDelete(doc?._id)}
+                              disabled={isDisabled}
+                            />
+                          </Tooltip>
+                        </div>
+                      </div>
+                      <div className="flex text-[15px] w-full gap-5 md:gap-0">
+                        <span className="md:w-[30%]">
+                          Create: {formatCreatedAt(doc?.createdAt)}
+                        </span>
+                        <span className="md:w-[30%]">
+                          Last update: {formatCreatedAt(doc?.updatedAt)}
+                        </span>
+                      </div>
+                      <div className="text-[15px]">
+                        <span>Owner: {doc?.owner}</span>
                       </div>
                     </div>
-                    <div className="flex text-[15px] w-full gap-5 md:gap-0">
-                      <span className="md:w-[30%]">
-                        Create: {formatCreatedAt(doc?.createdAt)}
-                      </span>
-                      <span className="md:w-[30%]">
-                        Last update: {formatCreatedAt(doc?.updatedAt)}
-                      </span>
+                  </div>
+                );
+              })
+            ) : viewMode === "List" && viewType === "Folder" ? (
+              currentDocuments.map((folder: any) => {
+                return (
+                  <div
+                    key={folder?._id}
+                    className="w-[90%] mt-2 border-b-2 border-t-2 flex justify-center items-center gap-2 md:h-[16%]"
+                  >
+                    <div className="w-[20%] flex justify-center border-r-2">
+                      <FolderOpenTwoTone className="text-[30px] sm:text-[60px]" />
                     </div>
-                    <div className="text-[15px]">
-                      <span>Owner: {doc?.owner}</span>
+                    <div className="w-[80%] flex flex-col p-2 gap-2">
+                      <div className="flex justify-between items-center font-semibold w-[100%]">
+                        <button className="max-w-[50%] text-[20px] hover:underline sm:text-[25px] truncate sm:max-w-[70%]">
+                          {folder?.title}
+                        </button>
+                        <div className="max-w-[50%] flex gap-2 sm:max-w-[30%]">
+                          <Tooltip title="Edit Title">
+                            <Button
+                              shape="circle"
+                              icon={<EditOutlined />}
+                              disabled={isDisabled}
+                              onClick={() =>
+                                handleShowModalChangeTitle(folder?._id)
+                              }
+                            />
+                          </Tooltip>
+                          <Tooltip title="Add File">
+                            <Button
+                              shape="circle"
+                              icon={<PlusCircleOutlined />}
+                              disabled={
+                                isDisabled
+                              }
+                            />
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <Button
+                              shape="circle"
+                              icon={<DeleteOutlined />}
+                              disabled={isDisabled}
+                            />
+                          </Tooltip>
+                        </div>
+                      </div>
+                      <div className="flex text-[15px] w-full gap-5 md:gap-0">
+                        <span className="md:w-[30%]">
+                          Create: {formatCreatedAt(folder?.createdAt)}
+                        </span>
+                        <span className="md:w-[30%]">
+                          Last update: {formatCreatedAt(folder?.updatedAt)}
+                        </span>
+                      </div>
+                      <div className="text-[15px]">
+                        <span>Owner: {folder?.owner}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : viewMode === "Kanban" && viewType === "File" ? (
+              <div className="w-[90%] flex flex-wrap justify-start">
+                {currentDocuments.map((doc: any) => {
+                  const userPermissions =
+                    doc.permissions?.[userData?.userInfo?._id];
+                  const canEdit = userPermissions === "edit";
+                  return (
+                    <div
+                      key={doc?._id}
+                      className="w-[30%] flex flex-col bg-[#F0F4F9] mb-4 p-4 rounded-xl gap-2 mr-9"
+                    >
+                      <div className="flex w-full justify-between">
+                        <FileTextTwoTone className="text-[20px]" />
+                        <button onClick={() => handleEditorChange(doc._id)}>
+                          {doc?.title}
+                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="hover:bg-gray-200 w-10">
+                            <EllipsisOutlined />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <div className="flex items-center gap-4">
+                              <Tooltip placement="topRight" title="Edit Title">
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleShowModalChangeTitle(doc?._id)
+                                  }
+                                  disabled={
+                                    isDisabled ||
+                                    (!canEdit &&
+                                      doc?.owner !== userData?.userInfo?.email)
+                                  }
+                                >
+                                  <EditOutlined />
+                                </DropdownMenuItem>
+                              </Tooltip>
+                              <Tooltip placement="topRight" title="Downdload">
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleDownloadDocument(
+                                      doc?.content,
+                                      doc?.title
+                                    )
+                                  }
+                                  disabled={isDisabled}
+                                >
+                                  <VerticalAlignBottomOutlined />
+                                </DropdownMenuItem>
+                              </Tooltip>
+                              <Tooltip placement="topRight" title="Share">
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleShowModalShareDocument(doc?._id)
+                                  }
+                                  disabled={
+                                    isDisabled ||
+                                    (!canEdit &&
+                                      doc?.owner !== userData?.userInfo?.email)
+                                  }
+                                >
+                                  <ShareAltOutlined />
+                                </DropdownMenuItem>
+                              </Tooltip>
+                              <Tooltip placement="topRight" title="Delete">
+                                <DropdownMenuItem
+                                  onClick={() => showModalDelete(doc?._id)}
+                                  disabled={isDisabled}
+                                >
+                                  <DeleteOutlined />
+                                </DropdownMenuItem>
+                              </Tooltip>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <button onClick={() => handleEditorChange(doc._id)}>
+                        <div className="w-full h-[180px] bg-white flex justify-center items-center rounded-xl">
+                          <FileTextTwoTone className="text-[30px] sm:text-[50px]" />
+                        </div>
+                      </button>
+                      <div className="flex w-full justify-between items-center">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[12px]">
+                            Owner: <Avatar icon={<UserOutlined />} size={20} />
+                          </span>
+                        </div>
+                        <span className="text-[12px]">
+                          Last modified: {formatCreatedAt(doc?.updatedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="w-[90%] flex flex-wrap justify-start">
+                {currentDocuments.map((folder: any) => {
+                  return (
+                    <div
+                      key={folder?._id}
+                      className="w-[30%] flex flex-col bg-[#F0F4F9] mb-4 p-4 rounded-xl gap-2 mr-9"
+                    >
+                      <div className="flex w-full justify-between">
+                      <FolderOpenTwoTone className="text-[20px]" />
+                        <button>
+                          {folder?.title}
+                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="hover:bg-gray-200 w-10">
+                            <EllipsisOutlined />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-2">
+                            <div className="flex items-center gap-4">
+                              <Tooltip placement="topRight" title="Edit Title">
+                                <DropdownMenuItem
+                                  disabled={isDisabled}
+                                >
+                                  <EditOutlined />
+                                </DropdownMenuItem>
+                              </Tooltip>
+                              <Tooltip placement="topRight" title="Add File">
+                                <DropdownMenuItem
+                                  disabled={isDisabled}
+                                >
+                                 <PlusCircleOutlined />
+                                </DropdownMenuItem>
+                              </Tooltip>
+                              <Tooltip placement="topRight" title="Delete">
+                                <DropdownMenuItem
+                                  disabled={isDisabled}
+                                >
+                                  <DeleteOutlined />
+                                </DropdownMenuItem>
+                              </Tooltip>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <button>
+                        <div className="w-full h-[180px] bg-white flex justify-center items-center rounded-xl">
+                        <FolderOpenTwoTone className="text-[30px] sm:text-[50px]" />
+                        </div>
+                      </button>
+                      <div className="flex w-full justify-between items-center">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[12px]">
+                            Owner: <Tooltip placement="topRight" title={folder?.owner}><Avatar icon={<UserOutlined />} size={20} /></Tooltip>
+                          </span>
+                        </div>
+                        <span className="text-[12px]">
+                          Last modified: {formatCreatedAt(folder?.updatedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="w-[90%] flex fixed bottom-1 justify-center mt-4">
               <Pagination
                 current={currentPage}

@@ -9,14 +9,18 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import useFetchData from "@/service/component/getData";
-import { MenuOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
+import {
+  FileTextTwoTone,
+  MenuOutlined,
+  MenuUnfoldOutlined,
+} from "@ant-design/icons";
 import MenuMobile from "@/pages/components/MenuMobile";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 
 declare global {
   interface Window {
-    tinymce: any; 
+    tinymce: any;
   }
 }
 
@@ -168,14 +172,21 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     <>
       <div className="h-[100%] relative">
         <div className="w-[100%] h-[10%] flex justify-between items-center bg-[#F9FAFB] border-b">
-          <div className="flex w-[50%] justify-center items-center gap-2 ml-4 sm:w-[30%]">
-            <Label className="text-[20px]">Title:</Label>
-            <Input
-              className="h-8"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={documentId}
-            />
+          <div className="flex w-[50%] justify-start items-center gap-2 ml-4 sm:w-[30%]">
+            <div>
+              <Link to="/user/storage">
+                <FileTextTwoTone className="text-[30px] sm:text-[50px]" />
+              </Link>
+            </div>
+            <div className="flex flex-col">
+              <Label className="text-[20px]">Title:</Label>
+              <Input
+                className="h-8"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={documentId}
+              />
+            </div>
           </div>
           <div className="mr-4 flex gap-2">
             <Button
@@ -214,7 +225,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
 
         <div className="h-[90%]">
           <Editor
-            apiKey="8kpopll9pa8gpus8k7ikasqwm8wuktiabaxzl0fzh6txmk6x"
+            apiKey="je3ii0vwhrfin6fb0wvao2mp6d2tnthtnfkw5q66ejuz1mpx"
             value={editorContent}
             onEditorChange={handleEditorChange}
             init={{
@@ -286,10 +297,15 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 "autosave",
                 "save",
                 "help",
+                "export",
+                "powerpaste",
+                "autocorrect",
+                "tinymcespellchecker",
                 "preview importcss searchreplace autolink autosave save directionality code visualblocks visualchars fullscreen image link media template codesample table charmap pagebreak nonbreaking anchor insertdatetime advlist lists wordcount help charmap quickbars emoticons accordion",
               ],
               toolbar:
-                "undo redo | accordion accordionremove | blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent| forecolor backcolor removeformat | charmap emoticons | code fullscreen preview | save print | pagebreak anchor codesample | ltr rtl ",
+                "undo redo | accordion accordionremove | blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent| forecolor backcolor removeformat | charmap emoticons | code fullscreen preview | save print | pagebreak anchor codesample | ltr rtl | export",
+              spellchecker_language: "en_US",
               setup: (editor) => {
                 editor.ui.registry.addMenuItem("save", {
                   text: "Save",
@@ -301,6 +317,8 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                     document.getElementById("file-input")?.click(),
                 });
               },
+              pagebreak_separator: "<!-- my page break -->",
+              pagebreak_split_block: true,
               automatic_uploads: true,
               autosave_restore_when_empty: true,
               autosave_ask_before_unload: true,
@@ -311,7 +329,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
               toolbar_mode: "sliding",
               file_picker_types: "file image media",
-              file_picker_callback: (cb,meta: any) => {
+              file_picker_callback: (cb, meta: any) => {
                 const input = document.createElement("input");
                 input.setAttribute("type", "file");
                 if (meta.filetype === "image") {
@@ -321,19 +339,20 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 } else {
                   input.setAttribute("accept", "*");
                 }
-      
+
                 input.onchange = function (e) {
                   const target = e.target as HTMLInputElement;
                   const file = target.files?.[0];
-      
+
                   if (file) {
                     const reader = new FileReader();
                     reader.onload = function () {
                       const base64 = reader.result?.toString().split(",")[1];
                       const id = "blobid" + new Date().getTime();
-                      const blobCache = window.tinymce?.activeEditor?.editorUpload.blobCache;
+                      const blobCache =
+                        window.tinymce?.activeEditor?.editorUpload.blobCache;
                       const blobInfo = blobCache?.create(id, file, base64);
-      
+
                       if (blobInfo) {
                         blobCache.add(blobInfo);
                         cb(blobInfo.blobUri(), { title: file.name });
@@ -342,7 +361,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                     reader.readAsDataURL(file);
                   }
                 };
-      
+
                 input.click();
               },
             }}

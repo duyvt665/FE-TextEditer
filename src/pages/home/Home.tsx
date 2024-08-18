@@ -28,15 +28,15 @@ const Home = () => {
   return (
     <>
       <div className="w-full h-dvh flex justify-between">
-        <div className="min-w-[20%] h-[100%] hidden lg:block">
+        {/* <div className="min-w-[20%] h-[100%] hidden lg:block">
           <SideBar />
-        </div>
+        </div> */}
         {loading ? (
           <div className="w-full h-dvh flex items-center justify-center">
             <SpinPage />
           </div>
         ) : (
-          <div className="w-[100%] lg:w-[80%] h-[95%]">
+          <div className="w-[100%] lg:w-[100%] h-[100%]">
             <TinyEditorComponent documentId={documentId}/>
           </div>
         )}

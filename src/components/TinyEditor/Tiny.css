@@ -22,3 +22,11 @@ div.tox.tox-tinymce {
 .tox .tox-statusbar__path {
   display: none;
 }
+
+.tox .tox-edit-area {
+	width: 50%;
+	margin: 0 auto;
+	flex: none !important;
+	filter: drop-shadow(0 0 0.75rem gray);
+  margin-top: 10px;
+}
