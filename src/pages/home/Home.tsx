@@ -36,7 +36,7 @@ const Home = () => {
             <SpinPage />
           </div>
         ) : (
-          <div className="w-[100%] lg:w-[85%] h-[95%]">
+          <div className="w-[100%] lg:w-[80%] h-[95%]">
             <TinyEditorComponent documentId={documentId}/>
           </div>
         )}

@@ -2,14 +2,19 @@ import { useEffect, useState } from "react";
 import SideBar from "./components/SideBar";
 import SpinPage from "@/components/Loader/SpinPage";
 import {
+  AppstoreOutlined,
+  BarsOutlined,
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
+  EyeOutlined,
   FileTextTwoTone,
   ShareAltOutlined,
+  UserOutlined,
   VerticalAlignBottomOutlined,
 } from "@ant-design/icons";
 import {
+  Avatar,
   Button,
   DatePicker,
   Dropdown,
@@ -19,6 +24,8 @@ import {
   message,
   Modal,
   Pagination,
+  Segmented,
+  Select,
   Tooltip,
 } from "antd";
 import useFetchData from "@/service/component/getData";
@@ -36,6 +43,7 @@ const Storage = () => {
   const [openModalShare, setOpenModalShare] = useState(false);
   const [idDocument, setIdDocument] = useState("");
   const [isDisabled, setIsDisabled] = useState(false);
+  const [isDisabledSave, setIsDisabledSave] = useState(false);
   const [newTitle, setNewTitle] = useState<string>("");
   const [newUser, setNewUser] = useState("");
   const [searchTitle, setSearchTitle] = useState("");
@@ -44,11 +52,18 @@ const Storage = () => {
   const [form] = Form.useForm();
   const { RangePicker } = DatePicker;
   const { Search } = Input;
+  const { Option } = Select;
   const [currentPage, setCurrentPage] = useState(1);
+  const [permission, setPermission] = useState("view");
+  const [permissionsUser, setPermissionsUser] = useState("view");
+  const [emailUser, setEmailUser] = useState("");
   const pageSize = 4;
+  const [userOwners, setUserOwners] = useState<
+    { email: string; permission: string }[]
+  >([]);
 
   const { data: documentList, refetch } = useFetchData("/user/get-documents");
-
+  const { data: userData } = useFetchData("/user/get-info");
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -56,22 +71,27 @@ const Storage = () => {
     if (!documentList) return [];
 
     return Object.values(documentList)
-      .filter((doc: any) =>
-        doc._id &&
-        doc.title.toLowerCase().includes(searchTitle.toLowerCase()) &&
-        (!createdAtRange ||
-          ((!createdAtRange[0] ||
-            new Date(doc.createdAt).setHours(0, 0, 0, 0) >=
-              new Date(createdAtRange[0]).setHours(0, 0, 0, 0)) &&
-            (!createdAtRange[1] ||
-              new Date(doc.createdAt).setHours(0, 0, 0, 0) <=
-                new Date(createdAtRange[1]).setHours(23, 59, 59, 999))))
+      .filter(
+        (doc: any) =>
+          doc._id &&
+          doc.title.toLowerCase().includes(searchTitle.toLowerCase()) &&
+          (!createdAtRange ||
+            ((!createdAtRange[0] ||
+              new Date(doc.createdAt).setHours(0, 0, 0, 0) >=
+                new Date(createdAtRange[0]).setHours(0, 0, 0, 0)) &&
+              (!createdAtRange[1] ||
+                new Date(doc.createdAt).setHours(0, 0, 0, 0) <=
+                  new Date(createdAtRange[1]).setHours(23, 59, 59, 999))))
       )
       .sort((a: any, b: any) => {
         if (sortOrder === "newest") {
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
         } else if (sortOrder === "oldest") {
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
         }
         return 0;
       });
@@ -81,7 +101,7 @@ const Storage = () => {
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
-  
+
   //SET LOADING STATE
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -135,9 +155,23 @@ const Storage = () => {
   //END SHOW AND CANCEL MODAL CHANGE DOCUMENT TITLE
 
   //SHOW AND CANCEL MODAL SHARE DOCUMENT
-  const handleShowModalShareDocument = (id: any) => {
+  const handleShowModalShareDocument = async (id: any) => {
     setIdDocument(id);
     setOpenModalShare(true);
+
+    try {
+      const response = await apiService.post("/user/user-owners", {
+        documentId: id,
+      });
+      if (response.statusCode === 200 && response.status === "success") {
+        const ownersArray = Object.keys(response)
+          .filter((key) => key !== "status" && key !== "statusCode")
+          .map((key) => response[key]);
+        setUserOwners(ownersArray);
+      }
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleCancelModalShareDocument = () => {
@@ -199,6 +233,7 @@ const Storage = () => {
       await apiService.post("/user/documents-share", {
         documentId: idDocument,
         email: newUser,
+        permission: permission,
       });
       message.success("Document shared successfully!");
       refetch();
@@ -244,6 +279,28 @@ const Storage = () => {
     document.body.removeChild(downloadLink);
   };
 
+  const handleSelectChange = (value: any, owner: any) => {
+    setPermissionsUser(value);
+    setEmailUser(owner);
+  };
+
+  //HANDLE PERMISSION CHANGE
+  const handlePermissionChange = async () => {
+    setIsDisabledSave(true);
+    try {
+      await apiService.post("/user/update-permissions", {
+        documentId: idDocument,
+        email: emailUser,
+        permission: permissionsUser,
+      });
+      message.success("Permissions updated successfully!");
+      handleCancelModalShareDocument();
+      setTimeout(() => setIsDisabledSave(false), 2000);
+    } catch (error) {
+      setTimeout(() => setIsDisabledSave(false), 2000);
+    }
+  };
+
   const sortMenu = (
     <Menu
       onClick={(e) => setSortOrder(e.key as "newest" | "oldest")}
@@ -274,31 +331,50 @@ const Storage = () => {
             </div>
 
             {/* FILTER */}
-            <div className="w-[90%] flex flex-col items-start gap-3 mt-2 sm:flex-row sm:items-center">
-              <Search
-                placeholder="Search Title"
-                allowClear
-                onChange={(e) => setSearchTitle(e.target.value)}
-                className="w-[50%] sm:w-[20%]"
-              />
-              <RangePicker
-                onChange={handleCreatedAtRange}
-                placeholder={["Start date", "End date"]}
-                className="w-[50%] sm:w-[20%]"
-              />
-              <Dropdown
-                overlay={sortMenu}
-                trigger={["click"]}
-                className="w-[30%] sm:w-[20%]"
-              >
-                <Button>
-                  Sort By <DownOutlined />
-                </Button>
-              </Dropdown>
+            <div className="w-[90%] flex items-start justify-between gap-3 mt-2 sm:flex-row sm:items-center">
+              <div className="w-[100%] flex flex-col gap-3 sm:flex-row">
+                <Search
+                  placeholder="Search Title"
+                  allowClear
+                  onChange={(e) => setSearchTitle(e.target.value)}
+                  className="w-[50%] sm:w-[20%]"
+                />
+                <RangePicker
+                  onChange={handleCreatedAtRange}
+                  placeholder={["Start date", "End date"]}
+                  className="w-[50%] sm:w-[20%]"
+                />
+                <Dropdown
+                  overlay={sortMenu}
+                  trigger={["click"]}
+                  className="w-[30%] sm:w-[20%]"
+                >
+                  <Button>
+                    Sort By <DownOutlined />
+                  </Button>
+                </Dropdown>
+              </div>
+              <div className="w-[]">
+                <Segmented
+                  options={[
+                    { label: "List", value: "List", icon: <BarsOutlined /> },
+                    {
+                      label: "Kanban",
+                      value: "Kanban",
+                      icon: <AppstoreOutlined />,
+                    },
+                  ]}
+                />
+              </div>
             </div>
 
             {/*STORAGE DOCUMENT */}
-            {currentDocuments.map((doc: any) => (
+            {currentDocuments.map((doc: any) => {
+              const userPermissions =
+                doc.permissions?.[userData?.userInfo?._id];
+              const canEdit = userPermissions === "edit";
+
+              return (
                 <div
                   key={doc?._id}
                   className="w-[90%] mt-2 border-b-2 border-t-2 flex justify-center items-center gap-2 md:h-[16%]"
@@ -307,7 +383,7 @@ const Storage = () => {
                     <FileTextTwoTone className="text-[30px] sm:text-[60px]" />
                   </div>
                   <div className="w-[80%] flex flex-col p-2 gap-2">
-                    <div className=" flex justify-between items-center font-semibold w-[100%] ">
+                    <div className="flex justify-between items-center font-semibold w-[100%]">
                       <button
                         className="max-w-[50%] text-[20px] hover:underline sm:text-[25px] truncate sm:max-w-[70%]"
                         onClick={() => handleEditorChange(doc._id)}
@@ -319,7 +395,11 @@ const Storage = () => {
                           <Button
                             shape="circle"
                             icon={<EditOutlined />}
-                            disabled={isDisabled}
+                            disabled={
+                              isDisabled ||
+                              (!canEdit &&
+                                doc?.owner !== userData?.userInfo?.email)
+                            }
                             onClick={() => handleShowModalChangeTitle(doc?._id)}
                           />
                         </Tooltip>
@@ -337,7 +417,11 @@ const Storage = () => {
                           <Button
                             shape="circle"
                             icon={<ShareAltOutlined />}
-                            disabled={isDisabled}
+                            disabled={
+                              isDisabled ||
+                              (!canEdit &&
+                                doc?.owner !== userData?.userInfo?.email)
+                            }
                             onClick={() =>
                               handleShowModalShareDocument(doc?._id)
                             }
@@ -366,16 +450,17 @@ const Storage = () => {
                     </div>
                   </div>
                 </div>
-              ))}
-              <div className="w-[90%] flex fixed bottom-1 justify-center mt-4">
-                <Pagination
-                  current={currentPage}
-                  total={paginatedDocuments.length}
-                  pageSize={pageSize}
-                  onChange={handlePageChange}
-                  showSizeChanger={false}
-                />
-              </div> 
+              );
+            })}
+            <div className="w-[90%] flex fixed bottom-1 justify-center mt-4">
+              <Pagination
+                current={currentPage}
+                total={paginatedDocuments.length}
+                pageSize={pageSize}
+                onChange={handlePageChange}
+                showSizeChanger={false}
+              />
+            </div>
           </div>
         )}
 
@@ -464,6 +549,13 @@ const Storage = () => {
           onCancel={handleCancelModalShareDocument}
           footer={[
             <button
+              className={`bg-blue-500 text-white w-[70px] rounded h-[30px] mr-2`}
+              disabled={isDisabled}
+              onClick={handlePermissionChange}
+            >
+              {isDisabledSave ? <SpinButton /> : "Save"}
+            </button>,
+            <button
               className="bg-blue-500 text-white w-[70px] rounded h-[30px]"
               disabled={isDisabled}
               onClick={handleShareDocument}
@@ -487,14 +579,66 @@ const Storage = () => {
               name="email"
               rules={[{ required: true, message: "Please input your Email!" }]}
             >
-              <Input
-                placeholder="email-user"
-                className="h-[36px]"
-                onChange={handleInputShareDocument}
-                value={newUser}
-              />
+              <div className="flex w-full gap-2">
+                <Input
+                  placeholder="email-user"
+                  className="h-[36px] w-[80%] rounded-md"
+                  onChange={handleInputShareDocument}
+                  value={newUser}
+                />
+                <Select
+                  defaultValue={permission}
+                  onChange={setPermission}
+                  className="h-[36px] !w-[20%]"
+                  style={{ border: 0 }}
+                >
+                  <Option value="view">
+                    <EyeOutlined className="mr-1" />
+                    View
+                  </Option>
+                  <Option value="edit">
+                    <EditOutlined className="mr-1" />
+                    Edit
+                  </Option>
+                </Select>
+              </div>
             </Form.Item>
           </Form>
+          <div className="flex flex-col gap-2">
+            <span className="font-semibold">People with access</span>
+            <div className="flex flex-col justify-center items-start gap-3">
+              {userOwners.map((owner, index) => (
+                <div
+                  className="flex items-center justify-between gap-1 w-full"
+                  key={index}
+                >
+                  <div className="flex items-center gap-1 max-w-[70%]">
+                    <Avatar icon={<UserOutlined />} />
+                    <span>{owner.email}</span>
+                  </div>
+                  <div className="w-[20%]">
+                    <Select
+                      defaultValue={owner.permission}
+                      className="h-[36px] !w-[100%]"
+                      onChange={(value) =>
+                        handleSelectChange(value, owner.email)
+                      }
+                      style={{ border: 0 }}
+                    >
+                      <Option value="view">
+                        <EyeOutlined className="mr-1" />
+                        View
+                      </Option>
+                      <Option value="edit">
+                        <EditOutlined className="mr-1" />
+                        Edit
+                      </Option>
+                    </Select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </Modal>
       </div>
     </>
