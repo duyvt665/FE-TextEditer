@@ -47,6 +47,7 @@
     "ckeditor5-premium-features": "^42.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "convertapi": "^1.14.0",
     "date-fns": "^3.6.0",
     "dictionary-en": "^4.0.0",
     "dictionary-en-us": "^3.0.0",

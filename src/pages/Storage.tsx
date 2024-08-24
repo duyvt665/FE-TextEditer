@@ -15,8 +15,10 @@ import {
   EditOutlined,
   EllipsisOutlined,
   EyeOutlined,
+  FileAddOutlined,
   FileTextOutlined,
   FileTextTwoTone,
+  FolderAddOutlined,
   FolderOpenTwoTone,
   FolderOutlined,
   PlusCircleOutlined,
@@ -45,6 +47,7 @@ import apiService from "@/service/apiService";
 import SpinButton from "@/components/Loader/SpinButton";
 import Header from "./components/Header";
 import React from "react";
+import { Base64 } from "js-base64";
 
 const Storage = () => {
   const [loading, setLoading] = useState(true);
@@ -52,11 +55,17 @@ const Storage = () => {
   const [openModalDelete, setOpenModalDelete] = useState(false);
   const [openModalChangeTitle, setOpenModalChangeTitle] = useState(false);
   const [openModalShare, setOpenModalShare] = useState(false);
+  const [openModalAddFolder, setOpenModalAddFolder] = useState(false);
+  const [openModalDeleteFolder, setOpenModalDeleteFolder] = useState(false);
+  const [openModalChangeNameFolder, setOpenModalChangeNameFolder] =
+    useState(false);
   const [idDocument, setIdDocument] = useState("");
   const [isDisabled, setIsDisabled] = useState(false);
   const [isDisabledSave, setIsDisabledSave] = useState(false);
   const [newTitle, setNewTitle] = useState<string>("");
   const [newUser, setNewUser] = useState("");
+  const [newFolder, setNewFolder] = useState<string>("");
+  const [newNameFolder, setNewNameFolder] = useState("");
   const [searchTitle, setSearchTitle] = useState("");
   const [createdAtRange, setCreatedAtRange] = useState<any>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | null>(null);
@@ -145,8 +154,8 @@ const Storage = () => {
   };
 
   //HANLDE NAVIGATION
-  const handleEditorChange = (docId: any) => {
-    navigation(`/home?docId=${docId}`);
+  const handleEditorChange = (docId: any, permission: string = "edit") => {
+    navigation(`/home?docId=${docId}&permission=${permission}`);
   };
 
   //SHOW AND CANCEL MODAL DELETE DOCUMENT
@@ -159,6 +168,30 @@ const Storage = () => {
     setOpenModalDelete(false);
   };
   //END SHOW AND CANCEL MODAL DELETE DOCUMENT
+
+  //SHOW AND CANCEL MODAL DELETE FOLDER
+  const showModalDeleteFolder = (id: any) => {
+    setIdDocument(id);
+    setOpenModalDeleteFolder(true);
+  };
+
+  const handleCancelModalDeleteFolder = () => {
+    setOpenModalDeleteFolder(false);
+  };
+  //END SHOW AND CANCEL MODAL DELETE FOLDER
+
+  //SHOW AND CANCEL MODAL RENAME TO FOLDER
+  const handleShowModalChangeNameFolder = (id: any) => {
+    setIdDocument(id);
+    setOpenModalChangeNameFolder(true);
+  };
+
+  const handleCancelModalChangeNameFolder = () => {
+    setOpenModalChangeNameFolder(false);
+    setNewNameFolder("");
+    form.resetFields();
+  };
+  //END SHOW AND CANCEL MODAL RENAME TO FOLDER
 
   //SHOW AND CANCEL MODAL CHANGE DOCUMENT TITLE
   const handleShowModalChangeTitle = (id: any) => {
@@ -199,6 +232,15 @@ const Storage = () => {
   };
   //END SHOW AND CANCEL MODAL SHARE DOCUMENT
 
+  const handleShowModalAddFolder = () => {
+    setOpenModalAddFolder(true);
+  };
+
+  const handleCancelModalAddFolder = () => {
+    setOpenModalAddFolder(false);
+    setNewFolder("");
+  };
+
   const handleInputTitleChange = async (e: any) => {
     setNewTitle(e.target.value);
     form.setFieldsValue({ newTitle: e.target.value });
@@ -207,6 +249,16 @@ const Storage = () => {
   const handleInputShareDocument = async (e: any) => {
     setNewUser(e.target.value);
     form.setFieldsValue({ email: e.target.value });
+  };
+
+  const handleInputAddModal = async (e: any) => {
+    setNewFolder(e.target.value);
+    form.setFieldsValue({ newFolder: e.target.value });
+  };
+
+  const handleInputChangeNameFolder = async (e: any) => {
+    setNewNameFolder(e.target.value);
+    form.setFieldsValue({ newNameFolder: e.target.value });
   };
 
   //HANDLE DELETE DOCUMENT
@@ -267,7 +319,7 @@ const Storage = () => {
 
   //HANDLE DOWNLOAD DOCUMENT
   const handleDownloadDocument = async (content: any, filename: string) => {
-    let htmlContent = atob(content);
+    let htmlContent = Base64.decode(content);
     const preHtml =
       "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc</title></head><body>";
 
@@ -319,6 +371,118 @@ const Storage = () => {
       setTimeout(() => setIsDisabledSave(false), 2000);
     }
   };
+
+  //HANDLE ADD FOLDER
+  const handleAddFolder = async () => {
+    setIsDisabled(true);
+    try {
+      await form.validateFields();
+      await apiService.post("/add-folder", { title: newFolder });
+      message.success("Add Folder Success!");
+      folderRefetch();
+      form.resetFields();
+      handleCancelModalAddFolder();
+      setTimeout(() => setIsDisabled(false), 2000);
+    } catch (error) {
+      setTimeout(() => setIsDisabled(false), 2000);
+    }
+  };
+
+  //HANDLE DELETE FOLDER
+  const handleDeleteFolder = async (id: any) => {
+    setIsDisabled(true);
+    try {
+      await apiService.delete(`/folder/remove/${id}`);
+      message.success("Folder deleted successfully!");
+      folderRefetch();
+      handleCancelModalDeleteFolder();
+      setTimeout(() => setIsDisabled(false), 2000);
+    } catch (error) {
+      setTimeout(() => setIsDisabled(false), 2000);
+    }
+  };
+
+  //HANDLE CHANGE NAME FOLDER
+  const handleChangeNameFolder = async () => {
+    setIsDisabled(true);
+    try {
+      await form.validateFields();
+      await apiService.post("/folder/rename", {
+        folderId: idDocument,
+        newName: newNameFolder,
+      });
+      message.success("Change name folder successfully!");
+      folderRefetch();
+      handleCancelModalChangeNameFolder();
+      setTimeout(() => setIsDisabled(false), 2000);
+    } catch (error) {
+      setTimeout(() => setIsDisabled(false), 2000);
+    }
+  };
+
+  //HANDLE ADD FILE
+  const handleImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".docx";
+    input.onchange = async (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (file) {
+        try {
+          const htmlString = await convertDocxToHtml(file);
+          const base64Html = btoa(htmlString);
+          const fileName = file.name.replace(/\.docx$/, '');
+          await addDocument(fileName, base64Html);
+        } catch (error) {
+          console.error("Error processing file:", error);
+        }
+      }
+    };
+    input.click();
+  };
+
+  const convertDocxToHtml = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("File", file);
+  
+    try {
+      const response = await fetch(
+        `https://v2.convertapi.com/convert/docx/to/html?Secret=secret_L3bC8e6kOywgxwSy`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error(`Error during conversion: ${response.statusText}`);
+      }
+  
+      const result = await response.json();
+  
+      const base64Html = result.Files[0].FileData;
+      let htmlContent = atob(base64Html);
+      htmlContent = htmlContent.replace(/<div class="page-break"><br><hr><br><\/div>/, '');
+  
+      return htmlContent;
+    } catch (error) {
+      console.error("Error during conversion:", error);
+      throw error;
+    }
+  };
+
+  const addDocument = async (title: string, content: string) => {
+    try {
+      await apiService.post("/user/add-document", {title: title, content: content})
+      message.success("Document added successfully!");
+      refetch();
+    } catch (error) {
+      console.error('Error adding document:', error);
+      throw error;
+    }
+  };
+   //END HANDLE ADD FILE
 
   const sortMenu = (
     <Menu
@@ -374,6 +538,22 @@ const Storage = () => {
                 </Dropdown>
               </div>
               <div className="flex gap-2">
+                <Tooltip title="Add File">
+                  <button
+                    className="bg-gray-100 px-4 rounded-md hover:bg-gray-200"
+                    onClick={handleImport}
+                  >
+                    <FileAddOutlined />
+                  </button>
+                </Tooltip>
+                <Tooltip title="Add Folder">
+                  <button
+                    className="bg-gray-100 px-4 rounded-md hover:bg-gray-200"
+                    onClick={handleShowModalAddFolder}
+                  >
+                    <FolderAddOutlined />
+                  </button>
+                </Tooltip>
                 <Segmented
                   options={[
                     {
@@ -394,8 +574,8 @@ const Storage = () => {
                   options={[
                     { label: "List", value: "List", icon: <BarsOutlined /> },
                     {
-                      label: "Kanban",
-                      value: "Kanban",
+                      label: "Grid",
+                      value: "Grid",
                       icon: <AppstoreOutlined />,
                     },
                   ]}
@@ -424,7 +604,9 @@ const Storage = () => {
                       <div className="flex justify-between items-center font-semibold w-[100%]">
                         <button
                           className="max-w-[50%] text-[20px] hover:underline sm:text-[25px] truncate sm:max-w-[70%]"
-                          onClick={() => handleEditorChange(doc._id)}
+                          onClick={() =>
+                            handleEditorChange(doc._id, userPermissions)
+                          }
                         >
                           {doc?.title}
                         </button>
@@ -514,7 +696,7 @@ const Storage = () => {
                               icon={<EditOutlined />}
                               disabled={isDisabled}
                               onClick={() =>
-                                handleShowModalChangeTitle(folder?._id)
+                                handleShowModalChangeNameFolder(folder?._id)
                               }
                             />
                           </Tooltip>
@@ -522,9 +704,7 @@ const Storage = () => {
                             <Button
                               shape="circle"
                               icon={<PlusCircleOutlined />}
-                              disabled={
-                                isDisabled
-                              }
+                              disabled={isDisabled}
                             />
                           </Tooltip>
                           <Tooltip title="Delete">
@@ -532,6 +712,7 @@ const Storage = () => {
                               shape="circle"
                               icon={<DeleteOutlined />}
                               disabled={isDisabled}
+                              onClick={() => showModalDeleteFolder(folder?._id)}
                             />
                           </Tooltip>
                         </div>
@@ -551,7 +732,7 @@ const Storage = () => {
                   </div>
                 );
               })
-            ) : viewMode === "Kanban" && viewType === "File" ? (
+            ) : viewMode === "Grid" && viewType === "File" ? (
               <div className="w-[90%] flex flex-wrap justify-start">
                 {currentDocuments.map((doc: any) => {
                   const userPermissions =
@@ -654,10 +835,8 @@ const Storage = () => {
                       className="w-[30%] flex flex-col bg-[#F0F4F9] mb-4 p-4 rounded-xl gap-2 mr-9"
                     >
                       <div className="flex w-full justify-between">
-                      <FolderOpenTwoTone className="text-[20px]" />
-                        <button>
-                          {folder?.title}
-                        </button>
+                        <FolderOpenTwoTone className="text-[20px]" />
+                        <button>{folder?.title}</button>
                         <DropdownMenu>
                           <DropdownMenuTrigger className="hover:bg-gray-200 w-10">
                             <EllipsisOutlined />
@@ -665,23 +844,17 @@ const Storage = () => {
                           <DropdownMenuContent align="end" className="w-2">
                             <div className="flex items-center gap-4">
                               <Tooltip placement="topRight" title="Edit Title">
-                                <DropdownMenuItem
-                                  disabled={isDisabled}
-                                >
+                                <DropdownMenuItem disabled={isDisabled}>
                                   <EditOutlined />
                                 </DropdownMenuItem>
                               </Tooltip>
                               <Tooltip placement="topRight" title="Add File">
-                                <DropdownMenuItem
-                                  disabled={isDisabled}
-                                >
-                                 <PlusCircleOutlined />
+                                <DropdownMenuItem disabled={isDisabled}>
+                                  <PlusCircleOutlined />
                                 </DropdownMenuItem>
                               </Tooltip>
                               <Tooltip placement="topRight" title="Delete">
-                                <DropdownMenuItem
-                                  disabled={isDisabled}
-                                >
+                                <DropdownMenuItem disabled={isDisabled}>
                                   <DeleteOutlined />
                                 </DropdownMenuItem>
                               </Tooltip>
@@ -691,13 +864,16 @@ const Storage = () => {
                       </div>
                       <button>
                         <div className="w-full h-[180px] bg-white flex justify-center items-center rounded-xl">
-                        <FolderOpenTwoTone className="text-[30px] sm:text-[50px]" />
+                          <FolderOpenTwoTone className="text-[30px] sm:text-[50px]" />
                         </div>
                       </button>
                       <div className="flex w-full justify-between items-center">
                         <div className="flex items-center gap-1">
                           <span className="text-[12px]">
-                            Owner: <Tooltip placement="topRight" title={folder?.owner}><Avatar icon={<UserOutlined />} size={20} /></Tooltip>
+                            Owner:{" "}
+                            <Tooltip placement="topRight" title={folder?.owner}>
+                              <Avatar icon={<UserOutlined />} size={20} />
+                            </Tooltip>
                           </span>
                         </div>
                         <span className="text-[12px]">
@@ -896,6 +1072,139 @@ const Storage = () => {
               ))}
             </div>
           </div>
+        </Modal>
+
+        {/* MODAL ADD FOLDER */}
+        <Modal
+          title="Add Folder"
+          open={openModalAddFolder}
+          onCancel={handleCancelModalAddFolder}
+          footer={[
+            <button
+              className="bg-blue-500 text-white w-[70px] rounded h-[30px]"
+              disabled={isDisabled}
+              onClick={handleAddFolder}
+            >
+              {isDisabled ? <SpinButton /> : "Add"}
+            </button>,
+          ]}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            requiredMark={false}
+            onFinish={handleRenameTitle}
+          >
+            <Form.Item
+              label={
+                <span className="text-[14px]">
+                  Name <span className="text-red-500">*</span>
+                </span>
+              }
+              name="newFolder"
+              rules={[
+                { required: true, message: "Please input name folder!" },
+                {
+                  min: 1,
+                  message: "Name folder must be at least 1 characters long!",
+                },
+                {
+                  max: 30,
+                  message: "Name folder must be at most 30 characters long!",
+                },
+                {
+                  pattern: /^[a-zA-Z0-9-_]+$/,
+                  message:
+                    "Name folder can only contain letters, numbers, hyphens (-) and underscores (_)",
+                },
+              ]}
+            >
+              <Input
+                placeholder="example-name"
+                className="h-[36px]"
+                onChange={handleInputAddModal}
+                value={newFolder}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* MODAL DELETE FOlDER */}
+        <Modal
+          open={openModalDeleteFolder}
+          title="Are you sure you want to delete folder?"
+          onCancel={handleCancelModalDeleteFolder}
+          footer={[
+            <button
+              className="bg-white text-black border-2 w-[70px] !mr-[10px] rounded h-[30px] hover:scale-[1.1]"
+              onClick={handleCancelModalDeleteFolder}
+              disabled={isDisabled}
+            >
+              Return
+            </button>,
+            <button
+              className="bg-red-500 text-white w-[70px] rounded h-[30px] hover:scale-[1.1]"
+              onClick={() => handleDeleteFolder(idDocument)}
+              disabled={isDisabled}
+            >
+              {isDisabled ? <SpinButton /> : <span>Delete</span>}
+            </button>,
+          ]}
+        ></Modal>
+
+        {/* MODAL RENAME FOLDER */}
+        <Modal
+          title="Rename Folder"
+          open={openModalChangeNameFolder}
+          onCancel={handleCancelModalChangeNameFolder}
+          footer={[
+            <button
+              className="bg-blue-500 text-white w-[70px] rounded h-[30px]"
+              disabled={isDisabled}
+              onClick={handleChangeNameFolder}
+            >
+              {isDisabled ? <SpinButton /> : "Rename"}
+            </button>,
+          ]}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            requiredMark={false}
+            onFinish={handleChangeNameFolder}
+          >
+            <Form.Item
+              label={
+                <span className="text-[14px]">
+                  Name <span className="text-red-500">*</span>
+                </span>
+              }
+              name="newNameFolder"
+              rules={[
+                { required: true, message: "Please input your Name Folder!" },
+                {
+                  min: 1,
+                  message: "Name must be at least 1 characters long!",
+                },
+                {
+                  max: 30,
+                  message: "Name must be at most 30 characters long!",
+                },
+                {
+                  pattern: /^[a-zA-Z0-9-_]+$/,
+                  message:
+                    "Title can only contain letters, numbers, hyphens (-) and underscores (_)",
+                },
+              ]}
+            >
+              <Input
+                placeholder="example-name"
+                className="h-[36px]"
+                onChange={handleInputChangeNameFolder}
+                value={newNameFolder}
+              />
+            </Form.Item>
+          </Form>
         </Modal>
       </div>
     </>

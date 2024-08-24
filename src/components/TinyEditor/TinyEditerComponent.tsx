@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Editor } from "@tinymce/tinymce-react";
+import { Editor as TinyMCEEditor } from "tinymce";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import { message } from "antd";
 import "./Tiny.css";
@@ -24,7 +25,7 @@ declare global {
   }
 }
 
-const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
+const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permission: string }) => {
   const [editorContent, setEditorContent] = useState<string>("");
   const [title, setTitle] = useState<string>("");
   const editorContentRef = useRef<string>("");
@@ -39,6 +40,14 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const isExternalUpdate = useRef(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() =>{
+    if(permission !== "edit"){
+      setDisabled(true);
+    } else{
+      setDisabled(false);
+    }
+  },[documentId])
+ 
   //SOCKET IO
   useEffect(() => {
     socketRef.current = io("ws://localhost:5555");
@@ -73,8 +82,53 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     setIsOpenMenu(!isOpenMenu);
   };
 
+  const handleInsertPageBreak = (editor: TinyMCEEditor) => {
+    const pageHeight = 1122; 
+    // const margin = 20;
+
+    const addPageBreaks = () => {
+      const body = editor.getBody();
+      let accumulatedHeight = 0;
+      const pageBreaks = body.querySelectorAll(".page-break");
+      pageBreaks.forEach((breakElem) => breakElem.remove());
+
+      Array.from(body.childNodes).forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const elementNode = node as HTMLElement;
+          const tempDiv = document.createElement("div");
+          tempDiv.style.visibility = "hidden";
+          tempDiv.style.position = "absolute";
+          tempDiv.style.width = "850px";
+          tempDiv.innerHTML = elementNode.outerHTML;
+          document.body.appendChild(tempDiv);
+
+          const statementHeight = tempDiv.offsetHeight;
+
+          
+          accumulatedHeight += statementHeight ;
+
+         
+          if (accumulatedHeight > pageHeight) {
+            
+            const pageBreak = document.createElement("div");
+            pageBreak.className = "page-break";
+            pageBreak.innerHTML = "<br><hr><br>"; 
+            body.insertBefore(pageBreak, node);
+            accumulatedHeight = statementHeight 
+          }
+
+          document.body.removeChild(tempDiv);
+        }
+      });
+    };
+
+    addPageBreaks();
+  };
+
   // HANDLE EDITOR CHANGE
-  const handleEditorChange = (content: string) => {
+  const handleEditorChange = (content: string, editor: TinyMCEEditor) => {
+    handleInsertPageBreak(editor);
+
     if (!isExternalUpdate.current) {
       setEditorContent(content);
       editorContentRef.current = content;
@@ -168,6 +222,57 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   };
   //END HANDLE UPDATE DOCUMENT
 
+  //HANDLE IMPORT DOCUMENT
+  const handleImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".docx";
+    input.onchange = async (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (file) {
+        try {
+          const htmlString = await convertDocxToHtml(file);
+          setEditorContent(htmlString); 
+        } catch (error) {
+          console.error("Error converting file:", error);
+        }
+      }
+    };
+    input.click();
+  };
+
+  const convertDocxToHtml = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("File", file);
+
+    try {
+      const response = await fetch(
+        `https://v2.convertapi.com/convert/docx/to/html?Secret=secret_L3bC8e6kOywgxwSy`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+      
+
+      if (!response.ok) {
+        throw new Error(`Error during conversion: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      const base64Html = result.Files[0].FileData;
+      let  htmlContent = Base64.decode(base64Html);
+      htmlContent = htmlContent.replace(/<div class="page-break"><br><hr><br><\/div>/, '');
+
+      return htmlContent;
+    } catch (error) {
+      console.error("Error during conversion:", error);
+      throw error;
+    }
+  };
+
   return (
     <>
       <div className="h-[100%] relative">
@@ -228,6 +333,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
             apiKey="je3ii0vwhrfin6fb0wvao2mp6d2tnthtnfkw5q66ejuz1mpx"
             value={editorContent}
             onEditorChange={handleEditorChange}
+            disabled = {disabled}
             init={{
               height: "100%",
               resize: false,
@@ -250,7 +356,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 insert: {
                   title: "Insert",
                   items:
-                    "link media image | template hr | pagebreak charmap emoticons | insertdatetime",
+                    "link media image | import |template hr | pagebreak charmap emoticons | insertdatetime",
                 },
                 format: {
                   title: "Format",
@@ -315,6 +421,10 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                   text: "Open File",
                   onAction: () =>
                     document.getElementById("file-input")?.click(),
+                });
+                editor.ui.registry.addMenuItem("Import", {
+                  text: "Import",
+                  onAction: handleImport,
                 });
               },
               pagebreak_separator: "<!-- my page break -->",

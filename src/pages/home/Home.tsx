@@ -9,7 +9,9 @@ const Home = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const docId = searchParams.get("docId");
+  const permission = searchParams.get("permission");
   const [documentId, setDocumentId] = useState<any>("");
+  const [userPermissions, setUserPermissions] = useState<any>("edit")
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -23,7 +25,11 @@ const Home = () => {
     if (docId) {
       setDocumentId(docId);
     }
-  }, [docId]);
+    if (permission) {
+      setUserPermissions(permission);
+    }
+  }, [docId, permission]);
+
 
   return (
     <>
@@ -37,7 +43,7 @@ const Home = () => {
           </div>
         ) : (
           <div className="w-[100%] lg:w-[100%] h-[100%]">
-            <TinyEditorComponent documentId={documentId}/>
+            <TinyEditorComponent documentId={documentId} permission={userPermissions}/>
           </div>
         )}
       </div>
