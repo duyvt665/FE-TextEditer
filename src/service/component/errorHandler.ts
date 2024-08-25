@@ -8,32 +8,17 @@ const handleApiError = (error: any) => {
     } else if (response && response.data && response.data.error) {
         const { code } = response.data.error;
         switch (code) {
-            case 'TITLE_URL_EXISTS':
-                message.error("Title URL already exists!");
-                break;
-            case 'SLUG_IN_USE':
-                message.error("Back-half already exists!");
-                break;
             case 'RESOURCE_NOT_FOUND':
                 message.error("Resource not found!");
                 break;
             case 'EMAIL_NOT_FOUND':
                 message.error("Email not found!");
                 break;
-            case 'LIMIT_EXCEEDED':
-                message.error("Exceeded maximum short link limit!");
-                break;
-            case 'MISSING_URL':
-                message.error("URL is required!");
-                break;
-            case 'TITLE_QR_EXISTS':
-                message.error("Title QR already exists!");
+            case 'USER_NOT_FOUND':
+                message.error("Username not found!");
                 break;
             case 'EMAIL_EXISTS':
                 message.error("Email already exists!");
-                break;
-            case 'RE_SEND_EMAIL_ERROR':
-                message.error("Please use the existing reset code sent to your email!");
                 break;
             case 'PASSWORD_MISMATCH':
                 message.error("New password and confirm password do not match!");
@@ -41,20 +26,35 @@ const handleApiError = (error: any) => {
             case 'INCORRECT_PASSWORD':
                 message.error("Current password is incorrect!");
                 break;
-            case 'NO_NEW_INFORMATION':
-                message.error("No new information provided!");
+            case 'USERNAME_EXISTS':
+                message.error("Username already exists!");
                 break;
-            case 'URL_NOT_FOUND_OR_NO_PERMISSION':
-                message.error("URL not found or you don't have permission to delete!");
+            case 'INVALID_USERID':
+                message.error("User not found!");
                 break;
-            case 'QR_NOT_FOUND_OR_NO_PERMISSION':
-                message.error("QR not found or you don't have permission to delete!");
+            case 'INVALID_INPUT':
+                message.error("Invalid input.");
                 break;
-            case 'INVALID_OR_EXPIRED_CODE':
-                message.error("Invalid or expired verification code!");
+            case 'TITLE_ALREADY_EXISTS':
+                message.error("Title already exists!");
+                break;
+            case 'DOCUMENT_NOT_FOUND':
+                message.error("Document not found!");
+                break;
+            case 'FORGOT_PASSWORD_LIMIT_EXCEEDED':
+                message.error("Exceeded the number of password reset requests per day. Try again tomorrow.")
+                break;
+            case 'UPDATE_TITLE_FAILED':
+                message.error("Failed to update document title.");
+                break;
+            case 'DOCUMENT_CREATION_FAILED':
+                message.error("Failed to create new document.");
+                break;
+            case 'DOCUMENT_EXISTS_FOLDER':
+                message.error("Document already exists in this folder")
                 break;
             default:
-                message.error("Error creating QR Code. Please try again!");
+                message.error("Error. Please try again!");
                 break;
         }
     } else {

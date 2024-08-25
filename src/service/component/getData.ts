@@ -1,13 +1,13 @@
-// useFetchData.ts
 import { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
 
-function useFetchData(endpoint: string) {
+function useFetchData(endpoint: string | null) {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
+    if (!endpoint) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -21,8 +21,10 @@ function useFetchData(endpoint: string) {
   }, [endpoint]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (endpoint) {
+      fetchData();
+    }
+  }, [fetchData, endpoint]);
 
   return { data, isLoading, error, refetch: fetchData };
 }
