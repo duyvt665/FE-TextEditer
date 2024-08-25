@@ -264,7 +264,7 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
 
       const base64Html = result.Files[0].FileData;
       let  htmlContent = Base64.decode(base64Html);
-      htmlContent = htmlContent.replace(/<div class="page-break"><br><hr><br><\/div>/, '');
+      // htmlContent = htmlContent.replace(/<div class="page-break"><br><hr><br><\/div>/, '');
 
       return htmlContent;
     } catch (error) {

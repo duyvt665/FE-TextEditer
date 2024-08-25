@@ -10,6 +10,7 @@ import {
 import {
   AppstoreOutlined,
   BarsOutlined,
+  CloseCircleOutlined,
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
@@ -59,6 +60,9 @@ const Storage = () => {
   const [openModalDeleteFolder, setOpenModalDeleteFolder] = useState(false);
   const [openModalChangeNameFolder, setOpenModalChangeNameFolder] =
     useState(false);
+  const [openModalAddFileToFolder, setOpenModalAddFileToFolder] =
+    useState(false);
+  const [openModalShowFileFolder, setOpenModalShowFileFolder] = useState(false);
   const [idDocument, setIdDocument] = useState("");
   const [isDisabled, setIsDisabled] = useState(false);
   const [isDisabledSave, setIsDisabledSave] = useState(false);
@@ -66,6 +70,7 @@ const Storage = () => {
   const [newUser, setNewUser] = useState("");
   const [newFolder, setNewFolder] = useState<string>("");
   const [newNameFolder, setNewNameFolder] = useState("");
+  const [folderId, setFolderId] = useState("");
   const [searchTitle, setSearchTitle] = useState("");
   const [createdAtRange, setCreatedAtRange] = useState<any>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | null>(null);
@@ -77,10 +82,11 @@ const Storage = () => {
   const [permission, setPermission] = useState("view");
   const [permissionsUser, setPermissionsUser] = useState("view");
   const [emailUser, setEmailUser] = useState("");
-
+  const [isLoading, setIsLoading] = useState(false);
   const [userOwners, setUserOwners] = useState<
     { email: string; permission: string }[]
   >([]);
+  const [responseData, setResponseData] = useState<any>(null);
   const [viewMode, setViewMode] = useState("List");
   const [viewType, setViewType] = useState("File");
   const pageSize = viewMode === "List" ? 4 : 6;
@@ -91,6 +97,14 @@ const Storage = () => {
   const { data: userData } = useFetchData("/user/get-info");
 
   const dataList = viewType === "File" ? documentList : folderList;
+
+  const fileList = responseData
+    ? Object.values(responseData).filter((item: any) => item._id)
+    : [];
+
+  const documentArray = documentList
+    ? Object.values(documentList).filter((item: any) => item._id)
+    : [];
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -232,6 +246,7 @@ const Storage = () => {
   };
   //END SHOW AND CANCEL MODAL SHARE DOCUMENT
 
+  //SHOW AND CANCEL MODAL ADD FOLDER
   const handleShowModalAddFolder = () => {
     setOpenModalAddFolder(true);
   };
@@ -239,6 +254,32 @@ const Storage = () => {
   const handleCancelModalAddFolder = () => {
     setOpenModalAddFolder(false);
     setNewFolder("");
+  };
+  //END SHOW AND CANCEL MODAL ADD FOLDER
+
+  //SHOW AND CANCEL MODAL ADD FILE TO FOLDER
+  const handleShowModalAddFileFolder = (folderId: any) => {
+    setOpenModalAddFileToFolder(true);
+    setFolderId(folderId);
+  };
+
+  const handleCancelModalAddFiletoFolder = () => {
+    setOpenModalAddFileToFolder(false);
+  };
+  //END SHOW AND CANCEL MODAL ADD FILE TO FOLDER
+
+  const handleShowModalShowFileInFolder = async (folderId: any) => {
+    setOpenModalShowFileFolder(true);
+    try {
+      const response = await apiService.post("/folder/get-document", {
+        folderId: folderId,
+      });
+      setResponseData(response);
+    } catch (error) {}
+  };
+
+  const handleCancelModalShowFileInFolder = () => {
+    setOpenModalShowFileFolder(false);
   };
 
   const handleInputTitleChange = async (e: any) => {
@@ -429,13 +470,16 @@ const Storage = () => {
       const target = event.target as HTMLInputElement;
       const file = target.files?.[0];
       if (file) {
+        setIsLoading(true);
         try {
           const htmlString = await convertDocxToHtml(file);
           const base64Html = btoa(htmlString);
-          const fileName = file.name.replace(/\.docx$/, '');
+          const fileName = file.name.replace(/\.docx$/, "");
           await addDocument(fileName, base64Html);
         } catch (error) {
           console.error("Error processing file:", error);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
@@ -445,7 +489,7 @@ const Storage = () => {
   const convertDocxToHtml = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append("File", file);
-  
+
     try {
       const response = await fetch(
         `https://v2.convertapi.com/convert/docx/to/html?Secret=secret_L3bC8e6kOywgxwSy`,
@@ -454,17 +498,16 @@ const Storage = () => {
           body: formData,
         }
       );
-  
+
       if (!response.ok) {
         throw new Error(`Error during conversion: ${response.statusText}`);
       }
-  
+
       const result = await response.json();
-  
+
       const base64Html = result.Files[0].FileData;
       let htmlContent = atob(base64Html);
-      htmlContent = htmlContent.replace(/<div class="page-break"><br><hr><br><\/div>/, '');
-  
+
       return htmlContent;
     } catch (error) {
       console.error("Error during conversion:", error);
@@ -474,15 +517,34 @@ const Storage = () => {
 
   const addDocument = async (title: string, content: string) => {
     try {
-      await apiService.post("/user/add-document", {title: title, content: content})
+      await apiService.post("/user/add-document", {
+        title: title,
+        content: content,
+      });
       message.success("Document added successfully!");
       refetch();
     } catch (error) {
-      console.error('Error adding document:', error);
+      console.error("Error adding document:", error);
       throw error;
     }
   };
-   //END HANDLE ADD FILE
+  //END HANDLE ADD FILE
+
+  //HANDLE ADD FILE TO FOLDER
+  const handleAddFileFolder = async () => {
+    setIsDisabled(true);
+    try {
+      await apiService.post("/folder/add-document", {
+        documentId: idDocument,
+        folderId: folderId,
+      });
+      message.success("Document added to folder successfully");
+      setTimeout(() => setIsDisabled(false), 2000);
+      handleCancelModalAddFiletoFolder();
+    } catch (error) {
+      setTimeout(() => setIsDisabled(false), 2000);
+    }
+  };
 
   const sortMenu = (
     <Menu
@@ -495,7 +557,7 @@ const Storage = () => {
   );
   return (
     <>
-      <div className="w-[100%] h-dvh flex justify-between">
+      <div className="w-[100%] h-dvh flex justify-between relative">
         {/* SIDE BAR */}
         <div className="min-w-[20%] h-[100%] hidden lg:block">
           <SideBar />
@@ -686,7 +748,12 @@ const Storage = () => {
                     </div>
                     <div className="w-[80%] flex flex-col p-2 gap-2">
                       <div className="flex justify-between items-center font-semibold w-[100%]">
-                        <button className="max-w-[50%] text-[20px] hover:underline sm:text-[25px] truncate sm:max-w-[70%]">
+                        <button
+                          className="max-w-[50%] text-[20px] hover:underline sm:text-[25px] truncate sm:max-w-[70%]"
+                          onClick={() =>
+                            handleShowModalShowFileInFolder(folder?._id)
+                          }
+                        >
                           {folder?.title}
                         </button>
                         <div className="max-w-[50%] flex gap-2 sm:max-w-[30%]">
@@ -704,6 +771,9 @@ const Storage = () => {
                             <Button
                               shape="circle"
                               icon={<PlusCircleOutlined />}
+                              onClick={() =>
+                                handleShowModalAddFileFolder(folder?._id)
+                              }
                               disabled={isDisabled}
                             />
                           </Tooltip>
@@ -814,9 +884,12 @@ const Storage = () => {
                       </button>
                       <div className="flex w-full justify-between items-center">
                         <div className="flex items-center gap-1">
-                          <span className="text-[12px]">
-                            Owner: <Avatar icon={<UserOutlined />} size={20} />
-                          </span>
+                          <Tooltip title={doc?.owner}>
+                            <span className="text-[12px]">
+                              Owner:{" "}
+                              <Avatar icon={<UserOutlined />} size={20} />
+                            </span>
+                          </Tooltip>
                         </div>
                         <span className="text-[12px]">
                           Last modified: {formatCreatedAt(doc?.updatedAt)}
@@ -1206,6 +1279,155 @@ const Storage = () => {
             </Form.Item>
           </Form>
         </Modal>
+
+        {/* MODAL ADD FILE IN FOLDER */}
+        <Modal
+          open={openModalAddFileToFolder}
+          title="Choose a File add Folder"
+          onCancel={handleCancelModalAddFiletoFolder}
+          footer={[
+            <button
+              className="bg-white text-black border-2 w-[70px] !mr-[10px] rounded h-[30px] hover:scale-[1.1]"
+              onClick={handleCancelModalAddFiletoFolder}
+              disabled={isDisabled}
+            >
+              Return
+            </button>,
+            <button
+              className="bg-blue-500 text-white w-[70px] rounded h-[30px] hover:scale-[1.1]"
+              onClick={() => handleAddFileFolder()}
+              disabled={isDisabled}
+            >
+              {isDisabled ? <SpinButton /> : <span>Add File</span>}
+            </button>,
+          ]}
+        >
+          <div className="my-4">
+            <Select
+              style={{ width: "100%" }}
+              placeholder="Select a folder"
+              disabled={isDisabled}
+              className="custom-select"
+              onChange={(value) => setIdDocument(value)}
+            >
+              {documentArray.map((document: any) => (
+                <Option key={document._id} value={document._id}>
+                  {document.title}
+                </Option>
+              ))}
+            </Select>
+          </div>
+        </Modal>
+
+        {/* MODAL SHOW FILE IN FOLDER */}
+        <Modal
+          open={openModalShowFileFolder}
+          title="Folder"
+          onCancel={handleCancelModalShowFileInFolder}
+          width={800}
+          footer={[
+            <button
+              className="bg-white text-black border-2 w-[70px] !mr-[10px] rounded h-[30px] hover:scale-[1.1]"
+              onClick={handleCancelModalShowFileInFolder}
+              disabled={isDisabled}
+            >
+              Return
+            </button>,
+          ]}
+        >
+          <div className="w-[100%] flex flex-col gap-3">
+            <div className="w-[100%] flex font-semibold border-b-2">
+              <span className="w-[5%]">Type</span>
+              <span className="w-[30%]">Name</span>
+              <span className="w-[25%]">Owner</span>
+              <span className="w-[20%]">Update At</span>
+              <span className="w-[20%]">Edit</span>
+            </div>
+            {fileList.map((document: any) => {
+              const userPermissions =
+                document.permissions?.[userData?.userInfo?._id];
+              const canEdit = userPermissions === "edit";
+
+              return (
+                <div className="w-[100%] flex border-b">
+                  <span className="w-[5%] text-center">
+                    <FileTextOutlined />
+                  </span>
+                  <button
+                    className="w-[30%] text-start text-blue-500 underline truncate"
+                    onClick={() =>
+                      handleEditorChange(document._id, userPermissions)
+                    }
+                  >
+                    {document?.title}
+                  </button>
+                  <span className="w-[25%]">{document?.owner}</span>
+                  <span className="w-[20%]">
+                    {formatCreatedAt(document?.updatedAt)}
+                  </span>
+                  <div className="w-[20%] flex gap-2">
+                    <Tooltip title="Edit Title">
+                      <button
+                        onClick={() =>
+                          handleShowModalChangeTitle(document?._id)
+                        }
+                        disabled={
+                          isDisabled ||
+                          (!canEdit &&
+                            document?.owner !== userData?.userInfo?.email)
+                        }
+                      >
+                        <EditOutlined />
+                      </button>
+                    </Tooltip>
+                    <Tooltip title="Download">
+                      <button
+                        onClick={() =>
+                          handleDownloadDocument(
+                            document?.content,
+                            document?.title
+                          )
+                        }
+                      >
+                        <VerticalAlignBottomOutlined />
+                      </button>
+                    </Tooltip>
+                    <Tooltip title="Share">
+                      <button
+                        onClick={() =>
+                          handleShowModalShareDocument(document?._id)
+                        }
+                        disabled={
+                          isDisabled ||
+                          (!canEdit &&
+                            document?.owner !== userData?.userInfo?.email)
+                        }
+                      >
+                        <ShareAltOutlined />
+                      </button>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <button onClick={() => showModalDelete(document?._id)}>
+                        <DeleteOutlined />
+                      </button>
+                    </Tooltip>
+                    <Tooltip title="Move out of folder">
+                      <button>
+                        <CloseCircleOutlined />
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Modal>
+
+        {isLoading && (
+          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+            <SpinPage />
+          </div>
+        )}
       </div>
     </>
   );
