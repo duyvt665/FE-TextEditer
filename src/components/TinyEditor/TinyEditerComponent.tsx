@@ -83,45 +83,69 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
   };
 
   const handleInsertPageBreak = (editor: TinyMCEEditor) => {
-    const pageHeight = 1122; 
-    // const margin = 20;
-
+    const pageHeight = 1122; // Chiều cao trang A4 trong pixels
+    const pageWidth = 793 ;   // Chiều rộng của trang (có thể thay đổi theo nhu cầu)
+    const margin = 0;       // Lề trang trong pixels
+    const wordsPerPage = 500; // Số từ tối đa mỗi trang (có thể thay đổi theo nhu cầu)
+  
+    const countWords = (text: string) => {
+      return text.split(/\s+/).filter(word => word.length > 0).length;
+    };
+  
     const addPageBreaks = () => {
       const body = editor.getBody();
       let accumulatedHeight = 0;
+      let wordCount = 0;
+  
+      // Xóa các dấu ngắt trang hiện có
       const pageBreaks = body.querySelectorAll(".page-break");
       pageBreaks.forEach((breakElem) => breakElem.remove());
-
+  
+      // Tạo phần tử tạm để tính toán chiều cao
+      const tempDiv = document.createElement("div");
+      tempDiv.style.visibility = "hidden";
+      tempDiv.style.position = "absolute";
+      tempDiv.style.width = pageWidth + "px";
+      document.body.appendChild(tempDiv);
+  
+      // Duyệt qua các phần tử và thêm dấu ngắt trang
       Array.from(body.childNodes).forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          const elementNode = node as HTMLElement;
-          const tempDiv = document.createElement("div");
-          tempDiv.style.visibility = "hidden";
-          tempDiv.style.position = "absolute";
-          tempDiv.style.width = "850px";
+          const elementNode = node as Element;
           tempDiv.innerHTML = elementNode.outerHTML;
-          document.body.appendChild(tempDiv);
-
           const statementHeight = tempDiv.offsetHeight;
-
-          
-          accumulatedHeight += statementHeight ;
-
-         
-          if (accumulatedHeight > pageHeight) {
-            
+          const textContent = elementNode.textContent || '';
+          const elementWordCount = countWords(textContent);
+  
+          // Kiểm tra nếu số từ và chiều cao của phần tử vượt quá giới hạn
+          if (accumulatedHeight + statementHeight > pageHeight - margin) {
+            // Thêm dấu ngắt trang trước phần tử hiện tại
             const pageBreak = document.createElement("div");
             pageBreak.className = "page-break";
-            pageBreak.innerHTML = "<br><hr><br>"; 
+            pageBreak.style.borderTop = "1px solid black";
+            pageBreak.style.margin = "10px 0";
+            // pageBreak.style.padding = "10px 0";
+            pageBreak.style.pageBreakBefore = "always";
+            pageBreak.style.textAlign = "center";
+            pageBreak.style.background = "#f9f9f9";
+            
+            // Chèn dấu ngắt trang vào trước phần tử hiện tại
             body.insertBefore(pageBreak, node);
-            accumulatedHeight = statementHeight 
+  
+            // Reset chiều cao tích lũy và số từ cho trang tiếp theo
+            accumulatedHeight = statementHeight;
+            wordCount = elementWordCount;
+          } else {
+            accumulatedHeight += statementHeight;
+            wordCount += elementWordCount;
           }
-
-          document.body.removeChild(tempDiv);
         }
       });
+  
+      // Xóa phần tử tạm
+      document.body.removeChild(tempDiv);
     };
-
+  
     addPageBreaks();
   };
 
@@ -233,6 +257,7 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
       if (file) {
         try {
           const htmlString = await convertDocxToHtml(file);
+          console.log(htmlString);
           setEditorContent(htmlString); 
         } catch (error) {
           console.error("Error converting file:", error);
@@ -264,8 +289,7 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
 
       const base64Html = result.Files[0].FileData;
       let  htmlContent = Base64.decode(base64Html);
-      // htmlContent = htmlContent.replace(/<div class="page-break"><br><hr><br><\/div>/, '');
-
+      
       return htmlContent;
     } catch (error) {
       console.error("Error during conversion:", error);
