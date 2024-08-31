@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Editor } from "@tinymce/tinymce-react";
+import { Editor as TinyMCEEditor } from "tinymce";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import { message } from "antd";
 import "./Tiny.css";
@@ -9,18 +10,22 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import useFetchData from "@/service/component/getData";
-import { MenuOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
+import {
+  FileTextTwoTone,
+  MenuOutlined,
+  MenuUnfoldOutlined,
+} from "@ant-design/icons";
 import MenuMobile from "@/pages/components/MenuMobile";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 
 declare global {
   interface Window {
-    tinymce: any; 
+    tinymce: any;
   }
 }
 
-const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
+const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permission: string }) => {
   const [editorContent, setEditorContent] = useState<string>("");
   const [title, setTitle] = useState<string>("");
   const editorContentRef = useRef<string>("");
@@ -35,6 +40,14 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   const isExternalUpdate = useRef(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() =>{
+    if(permission !== "edit"){
+      setDisabled(true);
+    } else{
+      setDisabled(false);
+    }
+  },[documentId])
+ 
   //SOCKET IO
   useEffect(() => {
     socketRef.current = io("ws://localhost:5555");
@@ -69,8 +82,77 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
     setIsOpenMenu(!isOpenMenu);
   };
 
+  const handleInsertPageBreak = (editor: TinyMCEEditor) => {
+    const pageHeight = 1122; // Chiều cao trang A4 trong pixels
+    const pageWidth = 793 ;   // Chiều rộng của trang (có thể thay đổi theo nhu cầu)
+    const margin = 0;       // Lề trang trong pixels
+    const wordsPerPage = 500; // Số từ tối đa mỗi trang (có thể thay đổi theo nhu cầu)
+  
+    const countWords = (text: string) => {
+      return text.split(/\s+/).filter(word => word.length > 0).length;
+    };
+  
+    const addPageBreaks = () => {
+      const body = editor.getBody();
+      let accumulatedHeight = 0;
+      let wordCount = 0;
+  
+      // Xóa các dấu ngắt trang hiện có
+      const pageBreaks = body.querySelectorAll(".page-break");
+      pageBreaks.forEach((breakElem) => breakElem.remove());
+  
+      // Tạo phần tử tạm để tính toán chiều cao
+      const tempDiv = document.createElement("div");
+      tempDiv.style.visibility = "hidden";
+      tempDiv.style.position = "absolute";
+      tempDiv.style.width = pageWidth + "px";
+      document.body.appendChild(tempDiv);
+  
+      // Duyệt qua các phần tử và thêm dấu ngắt trang
+      Array.from(body.childNodes).forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const elementNode = node as Element;
+          tempDiv.innerHTML = elementNode.outerHTML;
+          const statementHeight = tempDiv.offsetHeight;
+          const textContent = elementNode.textContent || '';
+          const elementWordCount = countWords(textContent);
+  
+          // Kiểm tra nếu số từ và chiều cao của phần tử vượt quá giới hạn
+          if (accumulatedHeight + statementHeight > pageHeight - margin) {
+            // Thêm dấu ngắt trang trước phần tử hiện tại
+            const pageBreak = document.createElement("div");
+            pageBreak.className = "page-break";
+            pageBreak.style.borderTop = "1px solid black";
+            pageBreak.style.margin = "10px 0";
+            // pageBreak.style.padding = "10px 0";
+            pageBreak.style.pageBreakBefore = "always";
+            pageBreak.style.textAlign = "center";
+            pageBreak.style.background = "#f9f9f9";
+            
+            // Chèn dấu ngắt trang vào trước phần tử hiện tại
+            body.insertBefore(pageBreak, node);
+  
+            // Reset chiều cao tích lũy và số từ cho trang tiếp theo
+            accumulatedHeight = statementHeight;
+            wordCount = elementWordCount;
+          } else {
+            accumulatedHeight += statementHeight;
+            wordCount += elementWordCount;
+          }
+        }
+      });
+  
+      // Xóa phần tử tạm
+      document.body.removeChild(tempDiv);
+    };
+  
+    addPageBreaks();
+  };
+
   // HANDLE EDITOR CHANGE
-  const handleEditorChange = (content: string) => {
+  const handleEditorChange = (content: string, editor: TinyMCEEditor) => {
+    handleInsertPageBreak(editor);
+
     if (!isExternalUpdate.current) {
       setEditorContent(content);
       editorContentRef.current = content;
@@ -164,18 +246,76 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
   };
   //END HANDLE UPDATE DOCUMENT
 
+  //HANDLE IMPORT DOCUMENT
+  const handleImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".docx";
+    input.onchange = async (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (file) {
+        try {
+          const htmlString = await convertDocxToHtml(file);
+          console.log(htmlString);
+          setEditorContent(htmlString); 
+        } catch (error) {
+          console.error("Error converting file:", error);
+        }
+      }
+    };
+    input.click();
+  };
+
+  const convertDocxToHtml = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("File", file);
+
+    try {
+      const response = await fetch(
+        `https://v2.convertapi.com/convert/docx/to/html?Secret=secret_L3bC8e6kOywgxwSy`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+      
+
+      if (!response.ok) {
+        throw new Error(`Error during conversion: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      const base64Html = result.Files[0].FileData;
+      let  htmlContent = Base64.decode(base64Html);
+      
+      return htmlContent;
+    } catch (error) {
+      console.error("Error during conversion:", error);
+      throw error;
+    }
+  };
+
   return (
     <>
       <div className="h-[100%] relative">
         <div className="w-[100%] h-[10%] flex justify-between items-center bg-[#F9FAFB] border-b">
-          <div className="flex w-[50%] justify-center items-center gap-2 ml-4 sm:w-[30%]">
-            <Label className="text-[20px]">Title:</Label>
-            <Input
-              className="h-8"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={documentId}
-            />
+          <div className="flex w-[50%] justify-start items-center gap-2 ml-4 sm:w-[30%]">
+            <div>
+              <Link to="/user/storage">
+                <FileTextTwoTone className="text-[30px] sm:text-[50px]" />
+              </Link>
+            </div>
+            <div className="flex flex-col">
+              <Label className="text-[20px]">Title:</Label>
+              <Input
+                className="h-8"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={documentId}
+              />
+            </div>
           </div>
           <div className="mr-4 flex gap-2">
             <Button
@@ -214,9 +354,10 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
 
         <div className="h-[90%]">
           <Editor
-            apiKey="8kpopll9pa8gpus8k7ikasqwm8wuktiabaxzl0fzh6txmk6x"
+            apiKey="je3ii0vwhrfin6fb0wvao2mp6d2tnthtnfkw5q66ejuz1mpx"
             value={editorContent}
             onEditorChange={handleEditorChange}
+            disabled = {disabled}
             init={{
               height: "100%",
               resize: false,
@@ -239,7 +380,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 insert: {
                   title: "Insert",
                   items:
-                    "link media image | template hr | pagebreak charmap emoticons | insertdatetime",
+                    "link media image | import |template hr | pagebreak charmap emoticons | insertdatetime",
                 },
                 format: {
                   title: "Format",
@@ -286,10 +427,15 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 "autosave",
                 "save",
                 "help",
+                "export",
+                "powerpaste",
+                "autocorrect",
+                "tinymcespellchecker",
                 "preview importcss searchreplace autolink autosave save directionality code visualblocks visualchars fullscreen image link media template codesample table charmap pagebreak nonbreaking anchor insertdatetime advlist lists wordcount help charmap quickbars emoticons accordion",
               ],
               toolbar:
-                "undo redo | accordion accordionremove | blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent| forecolor backcolor removeformat | charmap emoticons | code fullscreen preview | save print | pagebreak anchor codesample | ltr rtl ",
+                "undo redo | accordion accordionremove | blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent| forecolor backcolor removeformat | charmap emoticons | code fullscreen preview | save print | pagebreak anchor codesample | ltr rtl | export",
+              spellchecker_language: "en_US",
               setup: (editor) => {
                 editor.ui.registry.addMenuItem("save", {
                   text: "Save",
@@ -300,7 +446,13 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                   onAction: () =>
                     document.getElementById("file-input")?.click(),
                 });
+                editor.ui.registry.addMenuItem("Import", {
+                  text: "Import",
+                  onAction: handleImport,
+                });
               },
+              pagebreak_separator: "<!-- my page break -->",
+              pagebreak_split_block: true,
               automatic_uploads: true,
               autosave_restore_when_empty: true,
               autosave_ask_before_unload: true,
@@ -311,7 +463,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
               toolbar_mode: "sliding",
               file_picker_types: "file image media",
-              file_picker_callback: (cb,meta: any) => {
+              file_picker_callback: (cb, meta: any) => {
                 const input = document.createElement("input");
                 input.setAttribute("type", "file");
                 if (meta.filetype === "image") {
@@ -321,19 +473,20 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                 } else {
                   input.setAttribute("accept", "*");
                 }
-      
+
                 input.onchange = function (e) {
                   const target = e.target as HTMLInputElement;
                   const file = target.files?.[0];
-      
+
                   if (file) {
                     const reader = new FileReader();
                     reader.onload = function () {
                       const base64 = reader.result?.toString().split(",")[1];
                       const id = "blobid" + new Date().getTime();
-                      const blobCache = window.tinymce?.activeEditor?.editorUpload.blobCache;
+                      const blobCache =
+                        window.tinymce?.activeEditor?.editorUpload.blobCache;
                       const blobInfo = blobCache?.create(id, file, base64);
-      
+
                       if (blobInfo) {
                         blobCache.add(blobInfo);
                         cb(blobInfo.blobUri(), { title: file.name });
@@ -342,7 +495,7 @@ const TinyMCEComponent = ({ documentId }: { documentId: any }) => {
                     reader.readAsDataURL(file);
                   }
                 };
-      
+
                 input.click();
               },
             }}

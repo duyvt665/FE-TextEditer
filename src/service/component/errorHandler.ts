@@ -50,6 +50,9 @@ const handleApiError = (error: any) => {
             case 'DOCUMENT_CREATION_FAILED':
                 message.error("Failed to create new document.");
                 break;
+            case 'DOCUMENT_EXISTS_FOLDER':
+                message.error("Document already exists in this folder")
+                break;
             default:
                 message.error("Error. Please try again!");
                 break;

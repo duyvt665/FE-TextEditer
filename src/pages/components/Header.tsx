@@ -10,6 +10,7 @@ const Header = ({ title }: { title: string }) => {
   
   //API
   const { data: userData, refetch: refetchUserData } = useFetchData("/user/get-info");
+  
 
   const handleShowMenuMobile = () => {
     setIsOpenMenu(!isOpenMenu);
