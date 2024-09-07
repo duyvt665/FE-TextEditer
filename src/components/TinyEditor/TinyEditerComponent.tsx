@@ -84,9 +84,8 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
 
   const handleInsertPageBreak = (editor: TinyMCEEditor) => {
     const pageHeight = 1122; // Chiều cao trang A4 trong pixels
-    const pageWidth = 793 ;   // Chiều rộng của trang (có thể thay đổi theo nhu cầu)
-    const margin = 0;       // Lề trang trong pixels
-    const wordsPerPage = 500; // Số từ tối đa mỗi trang (có thể thay đổi theo nhu cầu)
+    const pageWidth = 793 ; 
+    const margin = 0;      
   
     const countWords = (text: string) => {
       return text.split(/\s+/).filter(word => word.length > 0).length;
@@ -97,18 +96,15 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
       let accumulatedHeight = 0;
       let wordCount = 0;
   
-      // Xóa các dấu ngắt trang hiện có
       const pageBreaks = body.querySelectorAll(".page-break");
       pageBreaks.forEach((breakElem) => breakElem.remove());
   
-      // Tạo phần tử tạm để tính toán chiều cao
       const tempDiv = document.createElement("div");
       tempDiv.style.visibility = "hidden";
       tempDiv.style.position = "absolute";
       tempDiv.style.width = pageWidth + "px";
       document.body.appendChild(tempDiv);
   
-      // Duyệt qua các phần tử và thêm dấu ngắt trang
       Array.from(body.childNodes).forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const elementNode = node as Element;
@@ -117,22 +113,17 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
           const textContent = elementNode.textContent || '';
           const elementWordCount = countWords(textContent);
   
-          // Kiểm tra nếu số từ và chiều cao của phần tử vượt quá giới hạn
           if (accumulatedHeight + statementHeight > pageHeight - margin) {
-            // Thêm dấu ngắt trang trước phần tử hiện tại
             const pageBreak = document.createElement("div");
             pageBreak.className = "page-break";
             pageBreak.style.borderTop = "1px solid black";
             pageBreak.style.margin = "10px 0";
-            // pageBreak.style.padding = "10px 0";
             pageBreak.style.pageBreakBefore = "always";
             pageBreak.style.textAlign = "center";
             pageBreak.style.background = "#f9f9f9";
             
-            // Chèn dấu ngắt trang vào trước phần tử hiện tại
             body.insertBefore(pageBreak, node);
   
-            // Reset chiều cao tích lũy và số từ cho trang tiếp theo
             accumulatedHeight = statementHeight;
             wordCount = elementWordCount;
           } else {
@@ -142,7 +133,6 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
         }
       });
   
-      // Xóa phần tử tạm
       document.body.removeChild(tempDiv);
     };
   
@@ -354,7 +344,7 @@ const TinyMCEComponent = ({ documentId, permission }: { documentId: any, permiss
 
         <div className="h-[90%]">
           <Editor
-            apiKey="je3ii0vwhrfin6fb0wvao2mp6d2tnthtnfkw5q66ejuz1mpx"
+            apiKey="wlzam9gx50tidxhm0rakh5du1p94vcc9n0xsq5lve9fscch1"
             value={editorContent}
             onEditorChange={handleEditorChange}
             disabled = {disabled}

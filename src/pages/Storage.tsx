@@ -63,6 +63,7 @@ const Storage = () => {
   const [openModalAddFileToFolder, setOpenModalAddFileToFolder] =
     useState(false);
   const [openModalShowFileFolder, setOpenModalShowFileFolder] = useState(false);
+  const [openModalRemoveDocumentFolder, setOpenModalRemoveDocumentFolder] =useState(false);
   const [idDocument, setIdDocument] = useState("");
   const [isDisabled, setIsDisabled] = useState(false);
   const [isDisabledSave, setIsDisabledSave] = useState(false);
@@ -270,6 +271,7 @@ const Storage = () => {
 
   const handleShowModalShowFileInFolder = async (folderId: any) => {
     setOpenModalShowFileFolder(true);
+    setFolderId(folderId);
     try {
       const response = await apiService.post("/folder/get-document", {
         folderId: folderId,
@@ -281,6 +283,15 @@ const Storage = () => {
   const handleCancelModalShowFileInFolder = () => {
     setOpenModalShowFileFolder(false);
   };
+
+  const handleShowModalRemoveDocumentFolder = (documentId: any) => {
+    setOpenModalRemoveDocumentFolder(true);
+    setIdDocument(documentId);
+  }
+
+  const handleCancelModalRemoveDocumentFolder = () => {
+    setOpenModalRemoveDocumentFolder(false)
+  }
 
   const handleInputTitleChange = async (e: any) => {
     setNewTitle(e.target.value);
@@ -545,6 +556,20 @@ const Storage = () => {
       setTimeout(() => setIsDisabled(false), 2000);
     }
   };
+
+  //HANDLE REMOVE DOCUMENT FROM FOLDER
+  const handleRemoveDocumentFolder = async () => {
+    setIsDisabled(true);
+    try{
+      await apiService.post("/folder/remove-document",{ documentId: idDocument, folderId: folderId})
+      message.success("Document deleted from folder successfully");
+      handleCancelModalShowFileInFolder();
+      handleCancelModalRemoveDocumentFolder();
+      setTimeout(() => setIsDisabled(false), 2000);
+    } catch (error) {
+      setTimeout(() => setIsDisabled(false), 2000);
+    }
+  }
 
   const sortMenu = (
     <Menu
@@ -1412,7 +1437,7 @@ const Storage = () => {
                       </button>
                     </Tooltip>
                     <Tooltip title="Move out of folder">
-                      <button>
+                      <button onClick={() => handleShowModalRemoveDocumentFolder(document?._id)}>
                         <CloseCircleOutlined />
                       </button>
                     </Tooltip>
@@ -1422,6 +1447,29 @@ const Storage = () => {
             })}
           </div>
         </Modal>
+
+        {/* MODAL REMOVE DOCUMENT TO FOLDER */}
+        <Modal
+          open={openModalRemoveDocumentFolder}
+          title="Are you sure you want to remove this document from the folder?"
+          onCancel={handleCancelModalRemoveDocumentFolder}
+          footer={[
+            <button
+              className="bg-white text-black border-2 w-[70px] !mr-[10px] rounded h-[30px] hover:scale-[1.1]"
+              onClick={handleCancelModalRemoveDocumentFolder}
+              disabled={isDisabled}
+            >
+              Return
+            </button>,
+            <button
+              className="bg-red-500 text-white w-[70px] rounded h-[30px] hover:scale-[1.1]"
+              onClick={handleRemoveDocumentFolder}
+              disabled={isDisabled}
+            >
+              {isDisabled ? <SpinButton /> : <span>Remove</span>}
+            </button>,
+          ]}
+        ></Modal>
 
         {isLoading && (
           <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
